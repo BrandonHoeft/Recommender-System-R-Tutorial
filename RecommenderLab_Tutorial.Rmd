@@ -20,25 +20,54 @@ This is an introduction to building Recommender Systems using R. The major CRAN 
 
 ## Collaborative Filtering
 
-The focus of this analysis will center around [*collaborative filtering*](https://en.wikipedia.org/wiki/Collaborative_filtering), one of the earliest forms of recommendation systems. The earliest developed forms of these algorithms are also known as *neighborhood based* or *memory based* algorithms, described below. The basic idea of collaborative filtering is that we have a ratings profile for each user or purchaser of some service. These data can be used to impute or predict missing ratings to form the basis of new recommendations for services/products not yet purchased.
+The focus of this analysis will center around [*collaborative filtering*](https://en.wikipedia.org/wiki/Collaborative_filtering), one of the earliest forms of recommendation systems. The earliest developed forms of these algorithms are also known as *neighborhood based* or *memory based* algorithms, described below. If using machine learning or statistical model methods, they're referred to as *model based* algorithms. The basic idea of collaborative filtering is that given a large database of ratings profiles for individual users on what they rated/purchased, we can impute or predict ratings on items not rated/purchased by them, forming the basis of recommendation scores or top-N recommended items. 
 
-Under *user-based collaborative filtering*, we can use the ratings or purchase behavior from all users, develop measures of similarity between users. After identifying the nearest neighbor(s) of each user profile, we'd be able to impute or predict missing ratings of each user based on some weighted average of most similar users and the types of services/products (referred herein as items) they've rated that are new to the individual user. 
+Under *user-based collaborative filtering*, this memory-based method works under the assumption that users with similar item tastes will rate items similarly. Therefore, the missing ratings for a user can be predicted by finding other similar users (a neighborhood). Within the neighborhood, we can aggregate the ratings of these neighbors on items unknown to the user, as basis for a prediction.
 
 An inverted approach to nearest neighbor based recommendations is *item-based collaborative filtering*. Instead of finding the most similar users to each individual, an algorithm assesses the similarities between the items that are correlated in their ratings or purchase profile amongst all users. 
+
+Some additional starter articles to learning more about collaborative filtering can be found [here](https://www.ibm.com/developerworks/library/os-recommender1/) and here(http://recommender-systems.org/collaborative-filtering/). 
+
+## Load recommenderlab
+
+Let's load the package and explore some of the datasets included in it. Recommenderlab is implemented using classes in the **S4** class system, so it's notation is a little different from most `r` packages, which are often written using the **S3** object class system. 
+
+``` {r}
+library(dplyr)
+library(recommenderlab)
+help(package = "recommenderlab")
+datasets_available <- data(package = "recommenderlab")
+datasets_available$results[,4] # titles
+```
+
+We'll work with the already available *Movielense* dataset.
+
+``` {r}
+data(MovieLense) # loads dataset
+class(MovieLense)
+```
+
+We see that it is formatted as a `realRatingMatrix` class already, an object class created within `recommenderlab` for efficient storage of user-item ratings matrices. It's been optimized for storing sparse matrices, where almost all of the elements are empty. As an example, compare the object size of *Movielense* as a `realRatingMatrix` vs. a `matrix`. 
+
+``` {r}
+library(pryr)
+object_size(MovieLense)
+object_size(as(MovieLense, "matrix"))
+```
+
+The `realRatingMatrix` is about 9 times more efficient in conserving memory than a traditional matrix object.
+
+Some of the methods that can be applied to the ratings matrix: 
+
+``` {r}
+methods(class = "realRatingMatrix")
+```
+
+
+## Strengs & Weaknesses
 
 * *Data Requirements*: a user ratings profile, containing items they’ve rated/clicked/purchased. A "rating" can be defined however it fits the business use case.
         	
 * *Strengths*: simple to implement, and recommendations are easy to explain to user. Transparency about the recommendation to a user can be a great boost to the user's confidence in trusting a rating. 
  
-* *Weaknesses*: these algorithms do not too work well on very sparse ratings matrices. These algorithms will not work from a cold start since a new user has no historic data profile or ratings for the algorithm to start from. 
-
-Some additional starter articles to learning more about collaborative filtering can be found [here](https://www.ibm.com/developerworks/library/os-recommender1/) and here(http://recommender-systems.org/collaborative-filtering/). 
-
-## Lets Start
-
-``` {r}
-library(dplyr)
-library(ggplot2)
-library(recommenderlab)
-```
-
+* *Weaknesses*: these algorithms do not too work well on very sparse ratings matrices. Additionally, they are computationally expensive as the entire user database needs to be processed as the basis of forming recommendations. These algorithms will not work from a cold start since a new user has no historic data profile or ratings for the algorithm to start from. 

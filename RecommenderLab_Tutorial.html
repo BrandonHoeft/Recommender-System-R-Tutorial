@@ -126,7 +126,8 @@ $(document).ready(function () {
 <ul>
 <li><a href="#introduction">Introduction</a></li>
 <li><a href="#collaborative-filtering">Collaborative Filtering</a></li>
-<li><a href="#lets-start">Lets Start</a></li>
+<li><a href="#load-recommenderlab">Load recommenderlab</a></li>
+<li><a href="#strengs-weaknesses">Strengs &amp; Weaknesses</a></li>
 </ul>
 </div>
 
@@ -136,21 +137,58 @@ $(document).ready(function () {
 </div>
 <div id="collaborative-filtering" class="section level2">
 <h2>Collaborative Filtering</h2>
-<p>The focus of this analysis will center around <a href="https://en.wikipedia.org/wiki/Collaborative_filtering"><em>collaborative filtering</em></a>, one of the earliest forms of recommendation systems. The earliest developed forms of these algorithms are also known as <em>neighborhood based</em> or <em>memory based</em> algorithms, described below. The basic idea of collaborative filtering is that we have a ratings profile for each user or purchaser of some service. These data can be used to impute or predict missing ratings to form the basis of new recommendations for services/products not yet purchased.</p>
-<p>Under <em>user-based collaborative filtering</em>, we can use the ratings or purchase behavior from all users, develop measures of similarity between users. After identifying the nearest neighbor(s) of each user profile, we’d be able to impute or predict missing ratings of each user based on some weighted average of most similar users and the types of services/products (referred herein as items) they’ve rated that are new to the individual user.</p>
+<p>The focus of this analysis will center around <a href="https://en.wikipedia.org/wiki/Collaborative_filtering"><em>collaborative filtering</em></a>, one of the earliest forms of recommendation systems. The earliest developed forms of these algorithms are also known as <em>neighborhood based</em> or <em>memory based</em> algorithms, described below. If using machine learning or statistical model methods, they’re referred to as <em>model based</em> algorithms. The basic idea of collaborative filtering is that given a large database of ratings profiles for individual users on what they rated/purchased, we can impute or predict ratings on items not rated/purchased by them, forming the basis of recommendation scores or top-N recommended items.</p>
+<p>Under <em>user-based collaborative filtering</em>, this memory-based method works under the assumption that users with similar item tastes will rate items similarly. Therefore, the missing ratings for a user can be predicted by finding other similar users (a neighborhood). Within the neighborhood, we can aggregate the ratings of these neighbors on items unknown to the user, as basis for a prediction.</p>
 <p>An inverted approach to nearest neighbor based recommendations is <em>item-based collaborative filtering</em>. Instead of finding the most similar users to each individual, an algorithm assesses the similarities between the items that are correlated in their ratings or purchase profile amongst all users.</p>
+<p>Some additional starter articles to learning more about collaborative filtering can be found <a href="https://www.ibm.com/developerworks/library/os-recommender1/">here</a> and here(<a href="http://recommender-systems.org/collaborative-filtering/" class="uri">http://recommender-systems.org/collaborative-filtering/</a>).</p>
+</div>
+<div id="load-recommenderlab" class="section level2">
+<h2>Load recommenderlab</h2>
+<p>Let’s load the package and explore some of the datasets included in it. Recommenderlab is implemented using classes in the <strong>S4</strong> class system, so it’s notation is a little different from most <code>r</code> packages, which are often written using the <strong>S3</strong> object class system.</p>
+<pre class="r"><code>library(dplyr)
+library(recommenderlab)
+help(package = &quot;recommenderlab&quot;)
+datasets_available &lt;- data(package = &quot;recommenderlab&quot;)
+datasets_available$results[,4] # titles</code></pre>
+<pre><code>[1] &quot;Jester dataset (5k sample)&quot;               
+[2] &quot;Jester dataset (5k sample)&quot;               
+[3] &quot;Anonymous web data from www.microsoft.com&quot;
+[4] &quot;MovieLense Dataset (100k)&quot;                
+[5] &quot;MovieLense Dataset (100k)&quot;                </code></pre>
+<p>We’ll work with the already available <em>Movielense</em> dataset.</p>
+<pre class="r"><code>data(MovieLense) # loads dataset
+class(MovieLense)</code></pre>
+<pre><code>[1] &quot;realRatingMatrix&quot;
+attr(,&quot;package&quot;)
+[1] &quot;recommenderlab&quot;</code></pre>
+<p>We see that it is formatted as a <code>realRatingMatrix</code> class already, an object class created within <code>recommenderlab</code> for efficient storage of user-item ratings matrices. It’s been optimized for storing sparse matrices, where almost all of the elements are empty. As an example, compare the object size of <em>Movielense</em> as a <code>realRatingMatrix</code> vs. a <code>matrix</code>.</p>
+<pre class="r"><code>library(pryr)
+object_size(MovieLense)</code></pre>
+<pre><code>1.39 MB</code></pre>
+<pre class="r"><code>object_size(as(MovieLense, &quot;matrix&quot;))</code></pre>
+<pre><code>12.7 MB</code></pre>
+<p>Some of the methods that can be applied to the ratings matrix:</p>
+<pre class="r"><code>methods(class = &quot;realRatingMatrix&quot;)</code></pre>
+<pre><code> [1] binarize               calcPredictionAccuracy coerce                
+ [4] colCounts              colMeans               colSds                
+ [7] colSums                denormalize            dimnames&lt;-            
+[10] dimnames               dim                    dissimilarity         
+[13] evaluationScheme       getData.frame          getList               
+[16] getNormalize           getRatingMatrix        getRatings            
+[19] getTopNLists           image                  normalize             
+[22] nratings               [                      [&lt;-                   
+[25] Recommender            removeKnownRatings     rowCounts             
+[28] rowMeans               rowSds                 rowSums               
+[31] sample                 show                   similarity            
+see '?methods' for accessing help and source code</code></pre>
+</div>
+<div id="strengs-weaknesses" class="section level2">
+<h2>Strengs &amp; Weaknesses</h2>
 <ul>
 <li><p><em>Data Requirements</em>: a user ratings profile, containing items they’ve rated/clicked/purchased. A “rating” can be defined however it fits the business use case.</p></li>
 <li><p><em>Strengths</em>: simple to implement, and recommendations are easy to explain to user. Transparency about the recommendation to a user can be a great boost to the user’s confidence in trusting a rating.</p></li>
-<li><p><em>Weaknesses</em>: these algorithms do not too work well on very sparse ratings matrices. These algorithms will not work from a cold start since a new user has no historic data profile or ratings for the algorithm to start from.</p></li>
+<li><p><em>Weaknesses</em>: these algorithms do not too work well on very sparse ratings matrices. Additionally, they are computationally expensive as the entire user database needs to be processed as the basis of forming recommendations. These algorithms will not work from a cold start since a new user has no historic data profile or ratings for the algorithm to start from.</p></li>
 </ul>
-<p>Some additional starter articles to learning more about collaborative filtering can be found <a href="https://www.ibm.com/developerworks/library/os-recommender1/">here</a> and here(<a href="http://recommender-systems.org/collaborative-filtering/" class="uri">http://recommender-systems.org/collaborative-filtering/</a>).</p>
-</div>
-<div id="lets-start" class="section level2">
-<h2>Lets Start</h2>
-<pre class="r"><code>library(dplyr)
-library(ggplot2)
-library(recommenderlab)</code></pre>
 </div>
 
 
