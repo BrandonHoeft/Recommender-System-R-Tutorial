@@ -127,6 +127,7 @@ $(document).ready(function () {
 <li><a href="#introduction">Introduction</a></li>
 <li><a href="#collaborative-filtering">Collaborative Filtering</a></li>
 <li><a href="#load-recommenderlab">Load recommenderlab</a></li>
+<li><a href="#explore-the-movielense-data">Explore the Movielense data</a></li>
 <li><a href="#strengs-weaknesses">Strengs &amp; Weaknesses</a></li>
 </ul>
 </div>
@@ -146,8 +147,10 @@ $(document).ready(function () {
 <h2>Load recommenderlab</h2>
 <p>Let’s load the package and explore some of the datasets included in it. Recommenderlab is implemented using classes in the <strong>S4</strong> class system, so it’s notation is a little different from most <code>r</code> packages, which are often written using the <strong>S3</strong> object class system.</p>
 <pre class="r"><code>library(dplyr)
-library(recommenderlab)
-help(package = &quot;recommenderlab&quot;)
+library(ggplot2)
+library(recommenderlab)</code></pre>
+<p>Some of the preloaded datasets that come with <code>recommenderlab</code> for learning and exploring.</p>
+<pre class="r"><code>help(package = &quot;recommenderlab&quot;)
 datasets_available &lt;- data(package = &quot;recommenderlab&quot;)
 datasets_available$results[,4] # titles</code></pre>
 <pre><code>[1] &quot;Jester dataset (5k sample)&quot;               
@@ -161,13 +164,16 @@ class(MovieLense)</code></pre>
 <pre><code>[1] &quot;realRatingMatrix&quot;
 attr(,&quot;package&quot;)
 [1] &quot;recommenderlab&quot;</code></pre>
-<p>We see that it is formatted as a <code>realRatingMatrix</code> class already, an object class created within <code>recommenderlab</code> for efficient storage of user-item ratings matrices. It’s been optimized for storing sparse matrices, where almost all of the elements are empty. As an example, compare the object size of <em>Movielense</em> as a <code>realRatingMatrix</code> vs. a <code>matrix</code>.</p>
+<pre class="r"><code>movie_r &lt;- MovieLense 
+remove(MovieLense)</code></pre>
+<p>It is formatted as a <code>realRatingMatrix</code> class already, an object class created within <code>recommenderlab</code> for efficient storage of user-item ratings matrices. It’s been optimized for storing sparse matrices, where almost all of the elements are empty. As an example, compare the object size of <em>Movielense</em> as a <code>realRatingMatrix</code> vs. a <code>matrix</code>.</p>
 <pre class="r"><code>library(pryr)
-object_size(MovieLense)</code></pre>
+object_size(movie_r)</code></pre>
 <pre><code>1.39 MB</code></pre>
-<pre class="r"><code>object_size(as(MovieLense, &quot;matrix&quot;))</code></pre>
+<pre class="r"><code>object_size(as(movie_r, &quot;matrix&quot;))</code></pre>
 <pre><code>12.7 MB</code></pre>
-<p>Some of the methods that can be applied to the ratings matrix:</p>
+<p>The <code>realRatingMatrix</code> for this particular dataset is about 9 times more efficient in conserving memory than a traditional matrix object.</p>
+<p>Some of the different functions that can be applied to the <code>realRatingMatrix</code> are:</p>
 <pre class="r"><code>methods(class = &quot;realRatingMatrix&quot;)</code></pre>
 <pre><code> [1] binarize               calcPredictionAccuracy coerce                
  [4] colCounts              colMeans               colSds                
@@ -181,6 +187,41 @@ object_size(MovieLense)</code></pre>
 [28] rowMeans               rowSds                 rowSums               
 [31] sample                 show                   similarity            
 see '?methods' for accessing help and source code</code></pre>
+</div>
+<div id="explore-the-movielense-data" class="section level2">
+<h2>Explore the Movielense data</h2>
+<p>Some initial information about the dimensions and ratings count within Movielense matrix.</p>
+<pre><code>943 x 1664 rating matrix of class 'realRatingMatrix' with 99392 ratings.</code></pre>
+<p>A preview of the first 25 users (rows of matrix) shows their count of movie ratings out of the 1664 available movies in the dataset.</p>
+<pre><code>  1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16  17  18 
+271  61  51  23 175 208 400  59  22 184 180  51 630  98 103 140  28 277 
+ 19  20  21  22  23  24  25 
+ 19  48 177 127 151  68  78 </code></pre>
+<p>Let’s preview some of the movies rated by User #1. User 1’s given an average rating of 3.61.</p>
+<pre><code>                                    Toy Story (1995) 
+                                                   5 
+                                    GoldenEye (1995) 
+                                                   3 
+                                   Four Rooms (1995) 
+                                                   4 
+                                   Get Shorty (1995) 
+                                                   3 
+                                      Copycat (1995) 
+                                                   3 
+Shanghai Triad (Yao a yao yao dao waipo qiao) (1995) 
+                                                   5 
+                               Twelve Monkeys (1995) 
+                                                   4 
+                                         Babe (1995) 
+                                                   1 
+                             Dead Man Walking (1995) 
+                                                   5 
+                                  Richard III (1995) 
+                                                   3 </code></pre>
+<p>The following histogram shows the distribution of all the movie ratings in the dataset.</p>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<pre><code>   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+   1.00    3.00    4.00    3.53    4.00    5.00 </code></pre>
 </div>
 <div id="strengs-weaknesses" class="section level2">
 <h2>Strengs &amp; Weaknesses</h2>

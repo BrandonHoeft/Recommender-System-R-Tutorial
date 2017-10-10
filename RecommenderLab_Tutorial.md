@@ -25,7 +25,14 @@ Let's load the package and explore some of the datasets included in it. Recommen
 
 ```r
 library(dplyr)
+library(ggplot2)
 library(recommenderlab)
+```
+
+Some of the preloaded datasets that come with `recommenderlab` for learning and exploring. 
+
+
+```r
 help(package = "recommenderlab")
 datasets_available <- data(package = "recommenderlab")
 datasets_available$results[,4] # titles
@@ -53,12 +60,17 @@ attr(,"package")
 [1] "recommenderlab"
 ```
 
-We see that it is formatted as a `realRatingMatrix` class already, an object class created within `recommenderlab` for efficient storage of user-item ratings matrices. It's been optimized for storing sparse matrices, where almost all of the elements are empty. As an example, compare the object size of *Movielense* as a `realRatingMatrix` vs. a `matrix`. 
+```r
+movie_r <- MovieLense 
+remove(MovieLense)
+```
+
+It is formatted as a `realRatingMatrix` class already, an object class created within `recommenderlab` for efficient storage of user-item ratings matrices. It's been optimized for storing sparse matrices, where almost all of the elements are empty. As an example, compare the object size of *Movielense* as a `realRatingMatrix` vs. a `matrix`. 
 
 
 ```r
 library(pryr)
-object_size(MovieLense)
+object_size(movie_r)
 ```
 
 ```
@@ -66,15 +78,16 @@ object_size(MovieLense)
 ```
 
 ```r
-object_size(as(MovieLense, "matrix"))
+object_size(as(movie_r, "matrix"))
 ```
 
 ```
 12.7 MB
 ```
 
+The `realRatingMatrix` for this particular dataset is about 9 times more efficient in conserving memory than a traditional matrix object.
 
-Some of the methods that can be applied to the ratings matrix: 
+Some of the different functions that can be applied to the `realRatingMatrix` are: 
 
 
 ```r
@@ -96,6 +109,59 @@ methods(class = "realRatingMatrix")
 see '?methods' for accessing help and source code
 ```
 
+## Explore the Movielense data
+
+Some initial information about the dimensions and ratings count within Movielense matrix. 
+
+
+```
+943 x 1664 rating matrix of class 'realRatingMatrix' with 99392 ratings.
+```
+
+A preview of the first 25 users (rows of matrix) shows their count of movie ratings out of the 1664 available movies in the dataset. 
+
+
+```
+  1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16  17  18 
+271  61  51  23 175 208 400  59  22 184 180  51 630  98 103 140  28 277 
+ 19  20  21  22  23  24  25 
+ 19  48 177 127 151  68  78 
+```
+
+Let's preview some of the movies rated by User #1. User 1's given an average rating of 3.61.
+
+
+```
+                                    Toy Story (1995) 
+                                                   5 
+                                    GoldenEye (1995) 
+                                                   3 
+                                   Four Rooms (1995) 
+                                                   4 
+                                   Get Shorty (1995) 
+                                                   3 
+                                      Copycat (1995) 
+                                                   3 
+Shanghai Triad (Yao a yao yao dao waipo qiao) (1995) 
+                                                   5 
+                               Twelve Monkeys (1995) 
+                                                   4 
+                                         Babe (1995) 
+                                                   1 
+                             Dead Man Walking (1995) 
+                                                   5 
+                                  Richard III (1995) 
+                                                   3 
+```
+
+The following histogram shows the distribution of all the movie ratings in the dataset.
+
+![](RecommenderLab_Tutorial_files/figure-html/unnamed-chunk-9-1.png)<!-- -->
+
+```
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+   1.00    3.00    4.00    3.53    4.00    5.00 
+```
 
 ## Strengs & Weaknesses
 
