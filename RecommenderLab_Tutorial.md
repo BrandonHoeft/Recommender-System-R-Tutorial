@@ -23,20 +23,9 @@ Some additional starter articles to learning more about collaborative filtering 
 Let's load the package and explore some of the datasets included in it. Recommenderlab is implemented using classes in the **S4** class system, so it's notation is a little different from most `r` packages, which are often written using the **S3** object class system. 
 
 
-```r
-library(dplyr)
-library(ggplot2)
-library(recommenderlab)
-```
 
 Some of the preloaded datasets that come with `recommenderlab` for learning and exploring. 
 
-
-```r
-help(package = "recommenderlab")
-datasets_available <- data(package = "recommenderlab")
-datasets_available$results[,4] # titles
-```
 
 ```
 [1] "Jester dataset (5k sample)"               
@@ -49,36 +38,17 @@ datasets_available$results[,4] # titles
 We'll work with the already available *Movielense* dataset.
 
 
-```r
-data(MovieLense) # loads dataset
-class(MovieLense)
-```
-
 ```
 [1] "realRatingMatrix"
 attr(,"package")
 [1] "recommenderlab"
 ```
 
-```r
-movie_r <- MovieLense 
-remove(MovieLense)
-```
-
 It is formatted as a `realRatingMatrix` class already, an object class created within `recommenderlab` for efficient storage of user-item ratings matrices. It's been optimized for storing sparse matrices, where almost all of the elements are empty. As an example, compare the object size of *Movielense* as a `realRatingMatrix` vs. a `matrix`. 
 
 
-```r
-library(pryr)
-object_size(movie_r)
-```
-
 ```
 1.39 MB
-```
-
-```r
-object_size(as(movie_r, "matrix"))
 ```
 
 ```
@@ -89,10 +59,6 @@ The `realRatingMatrix` for this particular dataset is about 9 times more efficie
 
 Some of the different functions that can be applied to the `realRatingMatrix` are: 
 
-
-```r
-methods(class = "realRatingMatrix")
-```
 
 ```
  [1] binarize               calcPredictionAccuracy coerce                
@@ -109,7 +75,7 @@ methods(class = "realRatingMatrix")
 see '?methods' for accessing help and source code
 ```
 
-## Explore the Movielense data
+## Exploratory Analysis of the Movielense data
 
 Some initial information about the dimensions and ratings count within Movielense matrix. 
 
@@ -154,16 +120,155 @@ Shanghai Triad (Yao a yao yao dao waipo qiao) (1995)
                                                    3 
 ```
 
-The following histogram shows the distribution of all the movie ratings in the dataset.
+The `getRatings` function returns the non-missing ratings values from the matrix as a numeric vector. The following histogram shows the distribution of the extracted movie ratings. We can see that ratings typically skew higher, centered around a median rating of 4. 
 
-![](RecommenderLab_Tutorial_files/figure-html/unnamed-chunk-9-1.png)<!-- -->
+
+```r
+summary(getRatings(movie_r))
+```
 
 ```
    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
    1.00    3.00    4.00    3.53    4.00    5.00 
 ```
 
-## Strengs & Weaknesses
+```r
+data.frame(ratings = getRatings(movie_r)) %>%
+  ggplot(aes(ratings)) + geom_bar(width = 0.75) +
+    labs(title = 'Movielense Ratings Distribution')
+```
+
+![](RecommenderLab_Tutorial_files/figure-html/unnamed-chunk-9-1.png)<!-- -->
+
+Using our `realRatingMatrix` object, we can also extract row counts to visualize distributions of the number of reviews given by each user. Below, the density is plotted along the y-axis instead of the raw counts, to give an idea of the the proportional frequency of each unit of each discrete bin in relation to the whole data set. The overall right-skewed distribution is indicative that most reviewers give very few overall reviews. 
+
+In terms of understanding the density values, this histogram has bin-width set to 20; with a density of close to 0.01125 for the first bin, the tallest bar this bin represents approximately 0.01125 x 10 units per bin = 0.225 total proportion of the individual reviewers in the data. In other words, 22.5% of the 943 in the data have given fewer than 10 reviews. 
+
+
+```r
+summary(rowCounts(movie_r))
+```
+
+```
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+   19.0    32.0    64.0   105.4   147.5   735.0 
+```
+
+```r
+rowCounts(movie_r) %>%
+  data.frame(reviews_per_person = .) %>%
+  ggplot(aes(x = reviews_per_person)) + 
+    geom_histogram(aes(y = ..density..), binwidth = 20) +
+    scale_y_continuous(limits = c(0,.0125), 
+                       breaks = seq(0, .0125, by = 0.0025),
+                       labels = seq(0, .0125, by = 0.0025)) +
+    labs(title = 'Number of Ratings Per MovieLense Reviewer')
+```
+
+![](RecommenderLab_Tutorial_files/figure-html/unnamed-chunk-10-1.png)<!-- -->
+
+Additionally, we can take a look at the average number of ratings given per each of the 1664 movies. Again, the right-skewed distribution here is indicative that the majority of films in the dataset are scarcely reviewed and there are a handful of movies with very high reviews, probably reflecting those films in the dataset with mass commercial appeal. 
+
+
+```r
+summary(colCounts(movie_r))
+```
+
+```
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+   1.00    7.00   27.00   59.73   80.00  583.00 
+```
+
+```r
+colCounts(movie_r) %>%
+  data.frame(movie_review_count = .) %>%
+  ggplot(aes(x = movie_review_count)) + 
+    geom_histogram(aes(y = ..density..), binwidth = 20) +
+    scale_y_continuous(limits = c(0,.0175)) +
+    labs(title = 'Number of Reviews Per MovieLense listed Movie')
+```
+
+![](RecommenderLab_Tutorial_files/figure-html/unnamed-chunk-11-1.png)<!-- -->
+
+**Can also explore summary(rowMeans(movie_r)) for average rating given per user.**
+
+** Can also explore summary(colMeans(movie_r)) for average rating given per movie. **
+
+## Create a Recommender System
+
+
+```
+$ALS_realRatingMatrix
+Recommender method: ALS for realRatingMatrix
+Description: Recommender for explicit ratings based on latent factors, calculated by alternating least squares algorithm.
+Reference: Yunhong Zhou, Dennis Wilkinson, Robert Schreiber, Rong Pan (2008). Large-Scale Parallel Collaborative Filtering for the Netflix Prize, 4th Int'l Conf. Algorithmic Aspects in Information and Management, LNCS 5034.
+Parameters:
+  normalize lambda n_factors n_iterations min_item_nr seed
+1      NULL    0.1        10           10           1 NULL
+
+$ALS_implicit_realRatingMatrix
+Recommender method: ALS_implicit for realRatingMatrix
+Description: Recommender for implicit data based on latent factors, calculated by alternating least squares algorithm.
+Reference: Yifan Hu, Yehuda Koren, Chris Volinsky (2008). Collaborative Filtering for Implicit Feedback Datasets, ICDM '08 Proceedings of the 2008 Eighth IEEE International Conference on Data Mining, pages 263-272.
+Parameters:
+  lambda alpha n_factors n_iterations min_item_nr seed
+1    0.1    10        10           10           1 NULL
+
+$IBCF_realRatingMatrix
+Recommender method: IBCF for realRatingMatrix
+Description: Recommender based on item-based collaborative filtering.
+Reference: NA
+Parameters:
+   k   method normalize normalize_sim_matrix alpha na_as_zero
+1 30 "Cosine"  "center"                FALSE   0.5      FALSE
+
+$POPULAR_realRatingMatrix
+Recommender method: POPULAR for realRatingMatrix
+Description: Recommender based on item popularity.
+Reference: NA
+Parameters:
+  normalize    aggregationRatings aggregationPopularity
+1  "center" new("standardGeneric" new("standardGeneric"
+
+$RANDOM_realRatingMatrix
+Recommender method: RANDOM for realRatingMatrix
+Description: Produce random recommendations (real ratings).
+Reference: NA
+Parameters: None
+
+$RERECOMMEND_realRatingMatrix
+Recommender method: RERECOMMEND for realRatingMatrix
+Description: Re-recommends highly rated items (real ratings).
+Reference: NA
+Parameters:
+  randomize minRating
+1         1        NA
+
+$SVD_realRatingMatrix
+Recommender method: SVD for realRatingMatrix
+Description: Recommender based on SVD approximation with column-mean imputation.
+Reference: NA
+Parameters:
+   k maxiter normalize
+1 10     100  "center"
+
+$SVDF_realRatingMatrix
+Recommender method: SVDF for realRatingMatrix
+Description: Recommender based on Funk SVD with gradient descend.
+Reference: NA
+Parameters:
+   k gamma lambda min_epochs max_epochs min_improvement normalize verbose
+1 10 0.015  0.001         50        200           1e-06  "center"   FALSE
+
+$UBCF_realRatingMatrix
+Recommender method: UBCF for realRatingMatrix
+Description: Recommender based on user-based collaborative filtering.
+Reference: NA
+Parameters:
+    method nn sample normalize
+1 "cosine" 25  FALSE  "center"
+```
+## Strengs & Weaknesses of Neighborhood Methods
 
 * *Data Requirements*: a user ratings profile, containing items they’ve rated/clicked/purchased. A "rating" can be defined however it fits the business use case.
         	

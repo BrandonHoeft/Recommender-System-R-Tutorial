@@ -11,7 +11,7 @@ output:
 
 ```{r setup, include = FALSE}
 # my global options defined for each code chunk.
-knitr::opts_chunk$set(fig.width=7, fig.height=5, echo=TRUE, warning=FALSE, message=FALSE, comment = '')
+knitr::opts_chunk$set(fig.width=7, fig.height=5, echo=FALSE, warning=FALSE, message=FALSE, comment = '')
 ```
 
 ## Introduction
@@ -71,38 +71,98 @@ Some of the different functions that can be applied to the `realRatingMatrix` ar
 methods(class = "realRatingMatrix")
 ```
 
-## Explore the Movielense data
+## Exploratory Analysis of the Movielense data
 
 Some initial information about the dimensions and ratings count within Movielense matrix. 
 
-``` {r echo = FALSE}
+``` {r}
 movie_r
 ```
 
 A preview of the first 25 users (rows of matrix) shows their count of movie ratings out of the 1664 available movies in the dataset. 
 
-``` {r echo = FALSE}
+``` {r }
 rowCounts(movie_r[1:25,])
 ```
 
 Let's preview some of the movies rated by User #1. User 1's given an average rating of `r round(rowMeans(movie_r[1, ]), 2)`.
 
-``` {r echo = FALSE}
+``` {r}
 as(movie_r[1, ], "list")[[1]][1:10]
 ```
 
-The following histogram shows the distribution of all the movie ratings in the dataset.
+The `getRatings` function returns the non-missing ratings values from the matrix as a numeric vector. The following histogram shows the distribution of the extracted movie ratings. We can see that ratings typically skew higher, centered around a median rating of 4. 
 
-``` {r echo = FALSE}
+``` {r echo = TRUE}
+summary(getRatings(movie_r))
+
 data.frame(ratings = getRatings(movie_r)) %>%
   ggplot(aes(ratings)) + geom_bar(width = 0.75) +
     labs(title = 'Movielense Ratings Distribution')
 
-summary(getRatings(movie_r))
+```
+
+Using our `realRatingMatrix` object, we can also extract row counts to visualize distributions of the number of reviews given by each user. Below, the density is plotted along the y-axis instead of the raw counts, to give an idea of the the proportional frequency of each unit of each discrete bin in relation to the whole data set. The overall right-skewed distribution is indicative that most reviewers give very few overall reviews. 
+
+In terms of understanding the density values, this histogram has bin-width set to 20; with a density of close to 0.01125 for the first bin, the tallest bar this bin represents approximately 0.01125 x 10 units per bin = `r 0.01125 * 20` total proportion of the individual reviewers in the data. In other words, `r 0.01125 * 20 * 100`% of the `r nrow(movie_r)` in the data have given fewer than 10 reviews. 
+
+``` {r echo = TRUE}
+summary(rowCounts(movie_r))
+
+rowCounts(movie_r) %>%
+  data.frame(reviews_per_person = .) %>%
+  ggplot(aes(x = reviews_per_person)) + 
+    geom_histogram(aes(y = ..density..), binwidth = 20) +
+    scale_y_continuous(limits = c(0,.0125), 
+                       breaks = seq(0, .0125, by = 0.0025),
+                       labels = seq(0, .0125, by = 0.0025)) +
+    labs(title = 'Number of Ratings Per MovieLense Reviewer')
 
 ```
 
-## Strengs & Weaknesses
+Additionally, we can take a look at the average number of ratings given per each of the `r ncol(movie_r)` movies. Again, the right-skewed distribution here is indicative that the majority of films in the dataset are scarcely reviewed and there are a handful of movies with very high reviews, probably reflecting those films in the dataset with mass commercial appeal. 
+
+``` {r echo = TRUE}
+summary(colCounts(movie_r))
+
+colCounts(movie_r) %>%
+  data.frame(movie_review_count = .) %>%
+  ggplot(aes(x = movie_review_count)) + 
+    geom_histogram(aes(y = ..density..), binwidth = 20) +
+    scale_y_continuous(limits = c(0,.0175)) +
+    labs(title = 'Number of Reviews Per MovieLense listed Movie')
+
+```
+
+**Can also visually explore summary(rowMeans(movie_r)) for average rating given per user.**
+
+**Can also visually explore summary(colMeans(movie_r)) for average rating given per movie.**
+
+## Recommender Algorithms Available
+
+The recommender algorithms are stored in a registry object called `recommenderRegistry`. We can call the algorithms available for working on numeric ratings based review data. 
+
+``` {r echo = TRUE}
+recommenderRegistry$get_entries(dataType = "realRatingMatrix")
+```
+
+## Exploring User-based Collaborative Filtering
+
+In the registry above, the last algorithm provided in the listing is the one we'll use to explore user-based collaborative filtering (UBCF). We fit the UBCF algorithm to our `realRatingMatrix` of MovieLense reviews data below. The API is very straightforward, and the model can be generated in a single line of code when using the default hyper parameters.
+
+``` {r echo = TRUE}
+ubcf_model <- Recommender(movie_r, method = "UBCF")
+```
+
+Now that we have a model, we can look at its metadata, such as the hyperparameters used to filter user recommendations. 
+
+``` {r echo = TRUE}
+getModel(ubcf_model)
+```
+
+
+
+## Strengs & Weaknesses of Neighborhood Methods
 
 * *Data Requirements*: a user ratings profile, containing items they’ve rated/clicked/purchased. A "rating" can be defined however it fits the business use case.
         	
