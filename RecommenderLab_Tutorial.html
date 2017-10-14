@@ -145,7 +145,7 @@ $(document).ready(function () {
 <div id="collaborative-filtering" class="section level2">
 <h2>Collaborative Filtering</h2>
 <p>The focus of this analysis will center around <a href="https://en.wikipedia.org/wiki/Collaborative_filtering"><em>collaborative filtering</em></a>, one of the earliest forms of recommendation systems. The earliest developed forms of these algorithms are also known as <em>neighborhood based</em> or <em>memory based</em> algorithms, described below. If using machine learning or statistical model methods, they’re referred to as <em>model based</em> algorithms. The basic idea of collaborative filtering is that given a large database of ratings profiles for individual users on what they rated/purchased, we can impute or predict ratings on items not rated/purchased by them, forming the basis of recommendation scores or top-N recommended items.</p>
-<p>Under <em>user-based collaborative filtering</em>, this memory-based method works under the assumption that users with similar item tastes will rate items similarly. Therefore, the missing ratings for a user can be predicted by finding other similar users (a neighborhood). Within the neighborhood, we can aggregate the ratings of these neighbors on items unknown to the user, as basis for a prediction.</p>
+<p>Under <em>user-based collaborative filtering</em>, this memory-based method works under the assumption that users with similar item tastes will rate items similarly. Therefore, the missing ratings for a user can be predicted by finding other similar users (a neighborhood). Within the neighborhood, we can aggregate the ratings of these neighbors on items unknown to the user, as basis for a prediction. We’ll explore this one in detail in sections below.</p>
 <p>An inverted approach to nearest neighbor based recommendations is <em>item-based collaborative filtering</em>. Instead of finding the most similar users to each individual, an algorithm assesses the similarities between the items that are correlated in their ratings or purchase profile amongst all users.</p>
 <p>Some additional starter articles to learning more about collaborative filtering can be found <a href="https://www.ibm.com/developerworks/library/os-recommender1/">here</a> and here(<a href="http://recommender-systems.org/collaborative-filtering/" class="uri">http://recommender-systems.org/collaborative-filtering/</a>).</p>
 </div>
@@ -184,13 +184,11 @@ see '?methods' for accessing help and source code</code></pre>
 <h2>Exploratory Analysis of the Movielense data</h2>
 <p>Some initial information about the dimensions and ratings count within Movielense matrix.</p>
 <pre><code>943 x 1664 rating matrix of class 'realRatingMatrix' with 99392 ratings.</code></pre>
-<p>A preview of the first 25 users (rows of matrix) shows their count of movie ratings out of the 1664 available movies in the dataset.</p>
-<pre><code>  1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16  17  18 
-271  61  51  23 175 208 400  59  22 184 180  51 630  98 103 140  28 277 
- 19  20  21  22  23  24  25 
- 19  48 177 127 151  68  78 </code></pre>
+<p>A preview of the first 10 users (rows of matrix) shows their count of movie ratings out of the 1664 available movies in the dataset.</p>
+<pre><code>  1   2   3   4   5   6   7   8   9  10 
+271  61  51  23 175 208 400  59  22 184 </code></pre>
 <p>Below is a preview of the ratings matrix of users and their ratings. Rows represent the user indexes.</p>
-<pre><code>10 x 5 sparse Matrix of class &quot;dgCMatrix&quot;
+<pre><code>10 x 4 sparse Matrix of class &quot;dgCMatrix&quot;
    Toy Story (1995) GoldenEye (1995) Four Rooms (1995) Get Shorty (1995)
 1                 5                3                 4                 3
 2                 4                .                 .                 .
@@ -201,18 +199,7 @@ see '?methods' for accessing help and source code</code></pre>
 7                 .                .                 .                 5
 8                 .                .                 .                 .
 9                 .                .                 .                 .
-10                4                .                 .                 4
-   Copycat (1995)
-1               3
-2               .
-3               .
-4               .
-5               .
-6               .
-7               .
-8               .
-9               .
-10              .</code></pre>
+10                4                .                 .                 4</code></pre>
 <p>Let’s preview some of the movies rated by User #1. User 1’s given an average rating of 3.61.</p>
 <pre><code>                                    Toy Story (1995) 
                                                    5 
@@ -309,7 +296,7 @@ Parameters:
 <div id="normalize-the-data" class="section level3">
 <h3>Normalize the data</h3>
 <p>Since we’re working with explicit real ratings of users, we need to acocunt for individual row bias of each user and make sure that all ratings are scaled similarly. The implication of not doing this could be potentially disasterous on new predicted ratings for any given user, dependent upon the different ratings bias of their k nearest neighbors.</p>
-<p>Here, user rating <em>zero mean centering</em> is used, where each user’s vector of ratings is subtracted by its own mean to center the mean at zero. Z-scoring is an alternative method available too that additionally divides each user’s rating by its standard deviation.</p>
+<p>User rating <em>zero mean centering</em> will be used for modeling, where each user’s vector of ratings is subtracted by its own mean to center the mean at zero. Z-scoring is an alternative method available too that additionally divides each user’s rating by its standard deviation.</p>
 <p>** maybe visualize the distribution of user ratings here too after normalization vs. before normalization **</p>
 </div>
 <div id="split-the-data-into-train-test" class="section level3">
@@ -320,34 +307,38 @@ Parameters:
 <div id="fit-the-model-on-training-data" class="section level3">
 <h3>Fit the model on Training Data</h3>
 <p>Having zero mean centered each user’s ratings to control for user bias, and splitting the data into model training and model testing partitions, time to fit a model. Parameters were tuned from defaults for illustrative purposes.</p>
-<pre class="r"><code>ubcf_model &lt;- Recommender(train, method = &quot;UBCF&quot;, 
+<pre class="r"><code>rec_model_train &lt;- Recommender(train, method = &quot;UBCF&quot;, 
                           parameter = list(method = &quot;cosine&quot;,
                                            nn = 10, # find each user's 10 most similar users. 
                                            sample = FALSE, # already did this.
-                                           normalize = NA)) # already did this. </code></pre>
-<p>Now that we have a model, we can look at its metadata, such as the hyperparameters used to filter user recommendations.</p>
-<pre class="r"><code>getModel(ubcf_model)</code></pre>
-<pre><code>$description
-[1] &quot;UBCF-Real data: contains full or sample of data set&quot;
-
-$data
-661 x 1664 rating matrix of class 'realRatingMatrix' with 69133 ratings.
-Normalized using center on rows.
-
-$method
-[1] &quot;cosine&quot;
-
-$nn
-[1] 10
-
-$sample
-[1] FALSE
-
-$normalize
-[1] NA
-
-$verbose
-[1] FALSE</code></pre>
+                                           normalize = &quot;center&quot;)) # already did this. </code></pre>
+<p>How the UBCF algorithm using the parameters listed above works:</p>
+<ol style="list-style-type: decimal">
+<li>Using <a href="https://en.wikipedia.org/wiki/Cosine_similarity">cosine similarity</a>, figure out how similar each user is to each other.</li>
+</ol>
+<ol style="list-style-type: lower-roman">
+<li>for each user, identify the <em>k</em> most similar users. Here, <em>k</em> parameter was the 10 most similar users who rated common items most similarly.</li>
+</ol>
+<ol start="2" style="list-style-type: decimal">
+<li>Per item, average the ratings by each user’s 10 most similar users.</li>
+</ol>
+<ol style="list-style-type: lower-roman">
+<li>weight the average ratings based on similarity score of each user whose rated the item. Similarity score equals weight.</li>
+<li>use any of the pythagorean averages, as suits the business case (arithmetic, geometric, harmonic)</li>
+</ol>
+<ol start="3" style="list-style-type: decimal">
+<li>Select a Top-N recommendations threshold.</li>
+</ol>
+<p>Now that we have a model, we can look at some of its details.</p>
+<pre class="r"><code>rec_model_train_details &lt;- getModel(rec_model_train)
+# the attributes from the getModel() function.
+names(rec_model_train_details)</code></pre>
+<pre><code>[1] &quot;description&quot; &quot;data&quot;        &quot;method&quot;      &quot;nn&quot;          &quot;sample&quot;     
+[6] &quot;normalize&quot;   &quot;verbose&quot;    </code></pre>
+<pre class="r"><code>rec_model_train_details$data</code></pre>
+<pre><code>661 x 1664 rating matrix of class 'realRatingMatrix' with 69133 ratings.
+Normalized using center on rows.</code></pre>
+<p>The <code>rec_model_train_details$data</code> object is a realRatingMatrix that contains all of the training data.</p>
 </div>
 </div>
 <div id="strengs-weaknesses-of-neighborhood-methods" class="section level2">

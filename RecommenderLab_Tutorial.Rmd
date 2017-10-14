@@ -22,7 +22,7 @@ This is an introduction to building Recommender Systems using R. The major CRAN 
 
 The focus of this analysis will center around [*collaborative filtering*](https://en.wikipedia.org/wiki/Collaborative_filtering), one of the earliest forms of recommendation systems. The earliest developed forms of these algorithms are also known as *neighborhood based* or *memory based* algorithms, described below. If using machine learning or statistical model methods, they're referred to as *model based* algorithms. The basic idea of collaborative filtering is that given a large database of ratings profiles for individual users on what they rated/purchased, we can impute or predict ratings on items not rated/purchased by them, forming the basis of recommendation scores or top-N recommended items. 
 
-Under *user-based collaborative filtering*, this memory-based method works under the assumption that users with similar item tastes will rate items similarly. Therefore, the missing ratings for a user can be predicted by finding other similar users (a neighborhood). Within the neighborhood, we can aggregate the ratings of these neighbors on items unknown to the user, as basis for a prediction.
+Under *user-based collaborative filtering*, this memory-based method works under the assumption that users with similar item tastes will rate items similarly. Therefore, the missing ratings for a user can be predicted by finding other similar users (a neighborhood). Within the neighborhood, we can aggregate the ratings of these neighbors on items unknown to the user, as basis for a prediction. We'll explore this one in detail in sections below.
 
 An inverted approach to nearest neighbor based recommendations is *item-based collaborative filtering*. Instead of finding the most similar users to each individual, an algorithm assesses the similarities between the items that are correlated in their ratings or purchase profile amongst all users. 
 
@@ -79,16 +79,16 @@ Some initial information about the dimensions and ratings count within Movielens
 movie_r
 ```
 
-A preview of the first 25 users (rows of matrix) shows their count of movie ratings out of the 1664 available movies in the dataset. 
+A preview of the first 10 users (rows of matrix) shows their count of movie ratings out of the 1664 available movies in the dataset. 
 
 ``` {r }
-rowCounts(movie_r[1:25,])
+rowCounts(movie_r[1:10,])
 ```
 
 Below is a preview of the ratings matrix of users and their ratings. Rows represent the user indexes.
 
 ``` {r }
-getRatingMatrix(movie_r[1:10, 1:5])
+getRatingMatrix(movie_r[1:10, 1:4])
 ```
 
 
@@ -169,7 +169,8 @@ vapply(recommenderRegistry$get_entries(dataType = "realRatingMatrix"),
 In the algorithms registry, the last algorithm provided in the listing is the one we'll use to explore user-based collaborative filtering (UBCF) to fit the UBCF algorithm to the `realRatingMatrix` of MovieLense reviews data. Information about this algorithm per the registry:
 
 ``` {r}
-tail(recommenderRegistry$get_entries(dataType = "realRatingMatrix"), 1)
+ubcf_model_description <- tail(recommenderRegistry$get_entries(dataType = "realRatingMatrix"), 1)
+ubcf_model_description
 ```
 
 There are 4 parameters to account for with this model as described above:
@@ -186,13 +187,14 @@ There are 4 parameters to account for with this model as described above:
 
 Since we're working with explicit real ratings of users, we need to acocunt for individual row bias of each user and make sure that all ratings are scaled similarly. The implication of not doing this could be potentially disasterous on new predicted ratings for any given user, dependent upon the different ratings bias of their k nearest neighbors. 
 
-Here, user rating *zero mean centering* is used, where each user's vector of ratings is subtracted by its own mean to center the mean at zero. Z-scoring is an alternative method available too that additionally divides each user's rating by its standard deviation. 
+User rating *zero mean centering* will be used for modeling, where each user's vector of ratings is subtracted by its own mean to center the mean at zero. Z-scoring is an alternative method available too that additionally divides each user's rating by its standard deviation. 
 
 ** maybe visualize the distribution of user ratings here too after normalization vs. before normalization **
 ``` {r}
 
-movie_r_norm <- normalize(movie_r, method = 'center')
+movie_r_norm <- normalize(movie_r, method = 'center') # for visual comparison purposes. 
 
+remove(movie_r_norm)
 ```
 
 ### Split the data into Train & Test
@@ -201,15 +203,15 @@ So we can more objectively measure the performance of the UBCF recommender syste
 
 ``` {r}
 set.seed(123)
-train_index <- sample(c(TRUE, FALSE), size = nrow(movie_r_norm), 
+train_index <- sample(c(TRUE, FALSE), size = nrow(movie_r), 
                       replace = TRUE, 
                       prob = c (.7, .3)) # weights for train/test size
 
-train <- movie_r_norm[train_index, ]
-test <- movie_r_norm[!train_index, ]
+train <- movie_r[train_index, ]
+test <- movie_r[!train_index, ]
 
 # check that train and test records sum up to movie_r records count. 
-sum(nrow(train), nrow(test)) == nrow(movie_r_norm)
+sum(nrow(train), nrow(test)) == nrow(movie_r)
 ```
 
 ### Fit the model on Training Data
@@ -217,19 +219,32 @@ sum(nrow(train), nrow(test)) == nrow(movie_r_norm)
 Having zero mean centered each user's ratings to control for user bias, and splitting the data into model training and model testing partitions, time to fit a model. Parameters were tuned from defaults for illustrative purposes. 
 
 ``` {r echo = TRUE}
-ubcf_model <- Recommender(train, method = "UBCF", 
+rec_model_train <- Recommender(train, method = "UBCF", 
                           parameter = list(method = "cosine",
                                            nn = 10, # find each user's 10 most similar users. 
                                            sample = FALSE, # already did this.
-                                           normalize = NA)) # already did this. 
+                                           normalize = "center")) # already did this. 
 ```
 
-Now that we have a model, we can look at its metadata, such as the hyperparameters used to filter user recommendations. 
+How the UBCF algorithm using the parameters listed above works:
+
+1. Using [cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity), figure out how similar each user is to each other. 
+  i) for each user, identify the *k* most similar users. Here, *k* parameter was the 10 most similar users who rated common items most similarly. 
+2. Per item, average the ratings by each user's 10 most similar users.
+  i) weight the average ratings based on similarity score of each user whose rated the item. Similarity score equals weight.
+  ii) use any of the pythagorean averages, as suits the business case (arithmetic, geometric, harmonic)
+3. Select a Top-N recommendations threshold. 
+
+Now that we have a model, we can look at some of its details. 
 
 ``` {r echo = TRUE}
-getModel(ubcf_model)
+rec_model_train_details <- getModel(rec_model_train)
+# the attributes from the getModel() function.
+names(rec_model_train_details)
+rec_model_train_details$data
 ```
 
+The `rec_model_train_details$data` object is a `r class(rec_model_train_details$data)` that contains all of the training data. 
 
 
 ## Strengs & Weaknesses of Neighborhood Methods
