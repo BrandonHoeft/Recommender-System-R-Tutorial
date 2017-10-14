@@ -225,12 +225,13 @@ The first thing to do is prepare the data, and set parameters for how the recomm
 ``` {r echo = TRUE}
 # Building a Recommender System with R by Gorakala and Usuelli. Ch.4 pp 77 - 83
 set.seed(123)
-model_train_scheme <- evaluationScheme(data = movie_r,
-                 method = 'split', # single train/test split
-                 train = train_proportion, # proportion of rows to train. 
-                 given = items_per_test_user_keep, # shouldn't keep n rec. items > min(rowCounts(movie_r))
-                 goodRating = good_threshold, # for binary classifier analysis. 
-                 k = 1)
+model_train_scheme <- movie_r %>%
+  evaluationScheme(method = 'split', # single train/test split
+                   train = train_proportion, # proportion of rows to train.
+                   given = items_per_test_user_keep, # shouldn't keep n rec. items > min(rowCounts(movie_r))
+                   goodRating = good_threshold, # for binary classifier analysis.
+                   k = 1)
+
 ```
 
 Having set our `evaluationScheme` and stored it in an object called *model_train_scheme*, we can fit a UBCF recommender system model. 
@@ -242,35 +243,64 @@ model_params <- list(method = "cosine",
                      sample = FALSE, # already did this.
                      normalize = "center")
 
-ubcf_model_train <- Recommender(data = getData(model_train_scheme, "train"), #only fit on the 75% training data.
-                                method = "UBCF",
-                                parameter = model_params)
+model1 <- getData(model_train_scheme, "train") %>% #only fit on the 75% training data.
+  Recommender(method = "UBCF", parameter = model_params)
 ```
 
 ### Evaluate Predictive Performance 
 
-Having built the model, next step is to use the holdout testing data to evaluate the model's performance. The `getData` gives us access to different datasets in the model training scheme. We used the *train* data to build the model. There is also *known* and *unknown* test data available for evaluation. The *known* portion returns the specified `r items_per_test_user_keep` items per test user to run through the recommender algorithm. These *known* records per test user will calibrate the test user's similarity to the trained records, identify and weight its nearest *k* neighbors, and then make item ratings or recommendation predictions. The predicted ratings or recommended items are compared to the remaining items for each test user that are still hidden or *unknown*. These *unknown* data therefore will be used to help compute prediction error of the model. 
+Having built the model, next step is to use the holdout testing data to evaluate the model's performance. The `getData` gives us access to different datasets in the model training scheme. We used the *train* data to build the model. There is also *known* and *unknown* test data available for evaluation. The *known* portion returns the specified `r items_per_test_user_keep` items per test user to give to the recommender algorithm. These *known* records per test user are withheld from predicting test performance; instead they are used to calibrate the test user's similarity to the trained records, identify and weight its nearest *k* neighbors, and then make item ratings or recommendation predictions. The predicted ratings or recommended items from these *known* data points per test user are compared to the remaining hidden items for each test user These *unknown* test user items therefore will be used to compute prediction error of the model. 
 
 Since testing the algorithm with new data requires a known battery of item ratings to calibrate each test user and make recommendations on new items, and an unknown portion of ratings that can be used to calculate prediction error of these resulting recommendations, it's important that the *given* parameter is less than the minimum number of rated items available per user, so that *unknown* test data is available for every test case to measure prediction error of ratings. 
 
 Next, we use the *known* part of the test users' item data (`r items_per_test_user_keep` items for each user) to make predicted ratings for new items of the test user that were hidden from the algorithm. We can also predict top N items instead of the ratings if that is preferred. 
 
 ``` {r echo = TRUE}
-# 5.6. Evaluation of predicted ratings in recommenderLab vignette. 
+# 5.5 - 5.6. Evaluation of predicted ratings in recommenderLab vignette. can use n = for predicting TopN or type = for predicting ratings.
 # https://cran.r-project.org/web/packages/recommenderlab/vignettes/recommenderlab.pdf
-ubcf_model_test_pred <- predict(ubcf_model_train, getData(model_train_scheme, "known"), type = "ratings")
+model1_pred <- predict(model1, getData(model_train_scheme, "known"), type = "ratings")
+model1_pred
+```
+
+Now we can test the predicion error of model 1 on the *unknown* test user ratings using the `calcPredictionAccuracy` method. Three metrics for ratings test error are available: root mean squared error, mean squared error, or mean absolute error. The results below focus on RMSE with the errors calculated per test user on their *unknown* data. 
+
+```{r echo = TRUE}
+test_error <- calcPredictionAccuracy(model1_pred, getData(model_train_scheme, "unknown"), byUser = TRUE)
+head(test_error)
+```
+
+Let's visualize the distribution of the average RMSE of new predicted ratings for each `r nrow(test_error)` test user.
+
+``` {r}
+test_user_error_data <- data.frame(user_id = as.numeric(row.names(test_error)),
+                                   rmse = test_error[, 1],
+                                   predicted_items_cnt = rowCounts(getData(model_train_scheme, "unknown"))) # coerce from matrix to df.
+
+test_user_error_data %>%
+  ggplot(aes(rmse)) +  
+    geom_histogram(aes(y = ..density..)) +
+    labs(title = 'RMSE on Predicted Recommendations per Test User',
+         subtitle = "User-Based Collaborative Filtering using Cosine Similarity")
 
 ```
 
+## Additional Aspects to Explore not yet Covered
 
+* In addition to fitting and testing a single model, this process can be repeated for different UBCF methods too. Candidate models can be evaluated based on the best RMSE for test users. Once a final model is selected, it can be fit on the entire dataset and used to make new recommendations going forward. 
+
+* Another aspect to explore is item based collaborative filtering (IBCF), which can generate similar predictions to UBCF methods. It will be interesting to see which one performs better on the other. 
+
+* Additionally, knowing the ** Top N ** recommendations may be more important than predicting a rating. The predicted ratings themselves could technically be sorted in descending order and ranked. However, this can be done more explicitely in the modeling process by using a cutoff value for a good rating threshold, building a ** Top N ** recommender model, and seeing how many good rated items from the *unknown* test user data that the model can identify. This becomes more of a traditional classification problem where ROC curves and analysis of True positives, False Positives, False Negatives, and True Negative recommendations can be analyzed. See section 5.7 (p.26) of the `recommenderLab` [vignette](https://cran.r-project.org/web/packages/recommenderlab/vignettes/recommenderlab.pdf) for details. 
 
 ## Strengs & Weaknesses of Neighborhood Methods
 
-* *Data Requirements*: a user ratings profile, containing items they’ve rated/clicked/purchased. A "rating" can be defined however it fits the business use case.
-        	
+From my initial learning about collaborative filtering methods so far, some of my current understanding on their strengths, weaknesses, and data input requirements. 
+
 * *Strengths*: simple to implement, and recommendations are easy to explain to user. Transparency about the recommendation to a user can be a great boost to the user's confidence in trusting a rating. 
  
 * *Weaknesses*: these algorithms do not too work well on very sparse ratings matrices. Additionally, they are computationally expensive as the entire user database needs to be processed as the basis of forming recommendations. These algorithms will not work from a cold start since a new user has no historic data profile or ratings for the algorithm to start from. 
+
+* *Data Requirements*: a user ratings profile, containing items they’ve rated/clicked/purchased. A "rating" can be defined however it fits the business use case.
 
 
 ``` {r eval = FALSE, include = FALSE}
