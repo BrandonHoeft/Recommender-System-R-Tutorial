@@ -190,12 +190,18 @@ colCounts(movie_r) %>%
 
 ![](RecommenderLab_Tutorial_files/figure-html/unnamed-chunk-11-1.png)<!-- -->
 
-**Can also explore summary(rowMeans(movie_r)) for average rating given per user.**
+**Can also visually explore summary(rowMeans(movie_r)) for average rating given per user.**
 
-** Can also explore summary(colMeans(movie_r)) for average rating given per movie. **
+**Can also visually explore summary(colMeans(movie_r)) for average rating given per movie.**
 
-## Create a Recommender System
+## Recommender Algorithms Available
 
+The recommender algorithms are stored in a registry object called `recommenderRegistry`. We can call the algorithms available for working on numeric ratings based review data. 
+
+
+```r
+recommenderRegistry$get_entries(dataType = "realRatingMatrix")
+```
 
 ```
 $ALS_realRatingMatrix
@@ -268,6 +274,49 @@ Parameters:
     method nn sample normalize
 1 "cosine" 25  FALSE  "center"
 ```
+
+## Exploring User-based Collaborative Filtering
+
+In the registry above, the last algorithm provided in the listing is the one we'll use to explore user-based collaborative filtering (UBCF). We fit the UBCF algorithm to our `realRatingMatrix` of MovieLense reviews data below. The API is very straightforward, and the model can be generated in a single line of code when using the default hyper parameters.
+
+
+```r
+ubcf_model <- Recommender(movie_r, method = "UBCF")
+```
+
+Now that we have a model, we can look at its metadata, such as the hyperparameters used to filter user recommendations. 
+
+
+```r
+getModel(ubcf_model)
+```
+
+```
+$description
+[1] "UBCF-Real data: contains full or sample of data set"
+
+$data
+943 x 1664 rating matrix of class 'realRatingMatrix' with 99392 ratings.
+Normalized using center on rows.
+
+$method
+[1] "cosine"
+
+$nn
+[1] 25
+
+$sample
+[1] FALSE
+
+$normalize
+[1] "center"
+
+$verbose
+[1] FALSE
+```
+
+
+
 ## Strengs & Weaknesses of Neighborhood Methods
 
 * *Data Requirements*: a user ratings profile, containing items they’ve rated/clicked/purchased. A "rating" can be defined however it fits the business use case.

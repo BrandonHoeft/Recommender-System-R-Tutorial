@@ -85,13 +85,20 @@ A preview of the first 25 users (rows of matrix) shows their count of movie rati
 rowCounts(movie_r[1:25,])
 ```
 
+Below is a preview of the ratings matrix of users and their ratings. Rows represent the user indexes.
+
+``` {r }
+getRatingMatrix(movie_r[1:10, 1:5])
+```
+
+
 Let's preview some of the movies rated by User #1. User 1's given an average rating of `r round(rowMeans(movie_r[1, ]), 2)`.
 
 ``` {r}
 as(movie_r[1, ], "list")[[1]][1:10]
 ```
 
-The `getRatings` function returns the non-missing ratings values from the matrix as a numeric vector. The following histogram shows the distribution of the extracted movie ratings. We can see that ratings typically skew higher, centered around a median rating of 4. 
+The `getRatings` function returns the non-missing ratings values from the matrix as a numeric vector. The following histogram shows the distribution of all movie ratings in the dataset. We can see that ratings typically skew higher, centered around a median rating of 4. 
 
 ``` {r echo = TRUE}
 summary(getRatings(movie_r))
@@ -122,6 +129,8 @@ rowCounts(movie_r) %>%
 
 Additionally, we can take a look at the average number of ratings given per each of the `r ncol(movie_r)` movies. Again, the right-skewed distribution here is indicative that the majority of films in the dataset are scarcely reviewed and there are a handful of movies with very high reviews, probably reflecting those films in the dataset with mass commercial appeal. 
 
+With a median number of reviews of `r median(colCounts(movie_r))` per user and `r ncol(movie_r)` different movies available to rate, we know that the data is sparse with a lot of users not having rated most of the movies available. 
+
 ``` {r echo = TRUE}
 summary(colCounts(movie_r))
 
@@ -140,18 +149,79 @@ colCounts(movie_r) %>%
 
 ## Recommender Algorithms Available
 
-The recommender algorithms are stored in a registry object called `recommenderRegistry`. We can call the algorithms available for working on numeric ratings based review data. 
+The recommender algorithms are stored in a registry object called `recommenderRegistry`. We can get a look at the different models based on the different matrix types.
 
 ``` {r echo = TRUE}
-recommenderRegistry$get_entries(dataType = "realRatingMatrix")
+names(recommenderRegistry$get_entries())
+```
+
+Since our matrix is a real ratings matrix, we'll call the algorithms available for working on numeric ratings based review data as stored in the `realRatingMatrix`. Here, I've pulled the descriptions of each of the algorithms available for working with real user ratings data. 
+
+``` {r eval = FALSE, echo = TRUE}
+vapply(recommenderRegistry$get_entries(dataType = "realRatingMatrix"), 
+       '[[', 
+       FUN.VALUE = "character", 
+       "description")
 ```
 
 ## Exploring User-based Collaborative Filtering
 
-In the registry above, the last algorithm provided in the listing is the one we'll use to explore user-based collaborative filtering (UBCF). We fit the UBCF algorithm to our `realRatingMatrix` of MovieLense reviews data below. The API is very straightforward, and the model can be generated in a single line of code when using the default hyper parameters.
+In the algorithms registry, the last algorithm provided in the listing is the one we'll use to explore user-based collaborative filtering (UBCF) to fit the UBCF algorithm to the `realRatingMatrix` of MovieLense reviews data. Information about this algorithm per the registry:
+
+``` {r}
+tail(recommenderRegistry$get_entries(dataType = "realRatingMatrix"), 1)
+```
+
+There are 4 parameters to account for with this model as described above:
+
+* method: this is the type of similarity metric to calculate similarity between users real ratings profile. Cosine similarity, Pearson correlation coefficient, and Jaccard similarity are available options. The first two are not good options if using unary ratings, but work well for this scenario.
+
+* nn: this parameter sets the neighborhood of most similar users to consider for each user profile. the ratings profiles of the k nearest neighbors will be the basis for making predictions on a users unrated items profile.
+
+* sample: a logical value to indicate whether the data should be sampled for train/test. Probably best to explicitely set a reproducible seed and sample the data before running the model.
+
+* normalize: how to normalize real ratings provided by different users. This is crucially important b/c all users have a different bias in how they tend to rate items. This can be done by passing a value to this parameter inside the algorithm or applied to the matrix before any modeling too. See `?normalize` for additional details. 
+
+### Normalize the data 
+
+Since we're working with explicit real ratings of users, we need to acocunt for individual row bias of each user and make sure that all ratings are scaled similarly. The implication of not doing this could be potentially disasterous on new predicted ratings for any given user, dependent upon the different ratings bias of their k nearest neighbors. 
+
+Here, user rating *zero mean centering* is used, where each user's vector of ratings is subtracted by its own mean to center the mean at zero. Z-scoring is an alternative method available too that additionally divides each user's rating by its standard deviation. 
+
+** maybe visualize the distribution of user ratings here too after normalization vs. before normalization **
+``` {r}
+
+movie_r_norm <- normalize(movie_r, method = 'center')
+
+```
+
+### Split the data into Train & Test
+
+So we can more objectively measure the performance of the UBCF recommender system, we will build it on a subset of training records, and test the model on a different subset of testing records that were withheld from the modeling process. 
+
+``` {r}
+set.seed(123)
+train_index <- sample(c(TRUE, FALSE), size = nrow(movie_r_norm), 
+                      replace = TRUE, 
+                      prob = c (.7, .3)) # weights for train/test size
+
+train <- movie_r_norm[train_index, ]
+test <- movie_r_norm[!train_index, ]
+
+# check that train and test records sum up to movie_r records count. 
+sum(nrow(train), nrow(test)) == nrow(movie_r_norm)
+```
+
+### Fit the model on Training Data
+
+Having zero mean centered each user's ratings to control for user bias, and splitting the data into model training and model testing partitions, time to fit a model. Parameters were tuned from defaults for illustrative purposes. 
 
 ``` {r echo = TRUE}
-ubcf_model <- Recommender(movie_r, method = "UBCF")
+ubcf_model <- Recommender(train, method = "UBCF", 
+                          parameter = list(method = "cosine",
+                                           nn = 10, # find each user's 10 most similar users. 
+                                           sample = FALSE, # already did this.
+                                           normalize = NA)) # already did this. 
 ```
 
 Now that we have a model, we can look at its metadata, such as the hyperparameters used to filter user recommendations. 
