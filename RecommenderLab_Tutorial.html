@@ -129,7 +129,11 @@ $(document).ready(function () {
 <li><a href="#load-recommenderlab">Load recommenderlab</a></li>
 <li><a href="#exploratory-analysis-of-the-movielense-data">Exploratory Analysis of the Movielense data</a></li>
 <li><a href="#recommender-algorithms-available">Recommender Algorithms Available</a></li>
-<li><a href="#exploring-user-based-collaborative-filtering">Exploring User-based Collaborative Filtering</a></li>
+<li><a href="#exploring-user-based-collaborative-filtering">Exploring User-based Collaborative Filtering</a><ul>
+<li><a href="#normalize-the-data">Normalize the data</a></li>
+<li><a href="#split-the-data-into-train-test">Split the data into Train &amp; Test</a></li>
+<li><a href="#fit-the-model-on-training-data">Fit the model on Training Data</a></li>
+</ul></li>
 <li><a href="#strengs-weaknesses-of-neighborhood-methods">Strengs &amp; Weaknesses of Neighborhood Methods</a></li>
 </ul>
 </div>
@@ -185,6 +189,30 @@ see '?methods' for accessing help and source code</code></pre>
 271  61  51  23 175 208 400  59  22 184 180  51 630  98 103 140  28 277 
  19  20  21  22  23  24  25 
  19  48 177 127 151  68  78 </code></pre>
+<p>Below is a preview of the ratings matrix of users and their ratings. Rows represent the user indexes.</p>
+<pre><code>10 x 5 sparse Matrix of class &quot;dgCMatrix&quot;
+   Toy Story (1995) GoldenEye (1995) Four Rooms (1995) Get Shorty (1995)
+1                 5                3                 4                 3
+2                 4                .                 .                 .
+3                 .                .                 .                 .
+4                 .                .                 .                 .
+5                 4                3                 .                 .
+6                 4                .                 .                 .
+7                 .                .                 .                 5
+8                 .                .                 .                 .
+9                 .                .                 .                 .
+10                4                .                 .                 4
+   Copycat (1995)
+1               3
+2               .
+3               .
+4               .
+5               .
+6               .
+7               .
+8               .
+9               .
+10              .</code></pre>
 <p>Let’s preview some of the movies rated by User #1. User 1’s given an average rating of 3.61.</p>
 <pre><code>                                    Toy Story (1995) 
                                                    5 
@@ -206,7 +234,7 @@ Shanghai Triad (Yao a yao yao dao waipo qiao) (1995)
                                                    5 
                                   Richard III (1995) 
                                                    3 </code></pre>
-<p>The <code>getRatings</code> function returns the non-missing ratings values from the matrix as a numeric vector. The following histogram shows the distribution of the extracted movie ratings. We can see that ratings typically skew higher, centered around a median rating of 4.</p>
+<p>The <code>getRatings</code> function returns the non-missing ratings values from the matrix as a numeric vector. The following histogram shows the distribution of all movie ratings in the dataset. We can see that ratings typically skew higher, centered around a median rating of 4.</p>
 <pre class="r"><code>summary(getRatings(movie_r))</code></pre>
 <pre><code>   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
    1.00    3.00    4.00    3.53    4.00    5.00 </code></pre>
@@ -229,6 +257,7 @@ Shanghai Triad (Yao a yao yao dao waipo qiao) (1995)
     labs(title = 'Number of Ratings Per MovieLense Reviewer')</code></pre>
 <p><img src="data:image/png;base64,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" /><!-- --></p>
 <p>Additionally, we can take a look at the average number of ratings given per each of the 1664 movies. Again, the right-skewed distribution here is indicative that the majority of films in the dataset are scarcely reviewed and there are a handful of movies with very high reviews, probably reflecting those films in the dataset with mass commercial appeal.</p>
+<p>With a median number of reviews of 27 per user and 1664 different movies available to rate, we know that the data is sparse with a lot of users not having rated most of the movies available.</p>
 <pre class="r"><code>summary(colCounts(movie_r))</code></pre>
 <pre><code>   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
    1.00    7.00   27.00   59.73   80.00  583.00 </code></pre>
@@ -244,105 +273,82 @@ Shanghai Triad (Yao a yao yao dao waipo qiao) (1995)
 </div>
 <div id="recommender-algorithms-available" class="section level2">
 <h2>Recommender Algorithms Available</h2>
-<p>The recommender algorithms are stored in a registry object called <code>recommenderRegistry</code>. We can call the algorithms available for working on numeric ratings based review data.</p>
-<pre class="r"><code>recommenderRegistry$get_entries(dataType = &quot;realRatingMatrix&quot;)</code></pre>
-<pre><code>$ALS_realRatingMatrix
-Recommender method: ALS for realRatingMatrix
-Description: Recommender for explicit ratings based on latent factors, calculated by alternating least squares algorithm.
-Reference: Yunhong Zhou, Dennis Wilkinson, Robert Schreiber, Rong Pan (2008). Large-Scale Parallel Collaborative Filtering for the Netflix Prize, 4th Int'l Conf. Algorithmic Aspects in Information and Management, LNCS 5034.
-Parameters:
-  normalize lambda n_factors n_iterations min_item_nr seed
-1      NULL    0.1        10           10           1 NULL
-
-$ALS_implicit_realRatingMatrix
-Recommender method: ALS_implicit for realRatingMatrix
-Description: Recommender for implicit data based on latent factors, calculated by alternating least squares algorithm.
-Reference: Yifan Hu, Yehuda Koren, Chris Volinsky (2008). Collaborative Filtering for Implicit Feedback Datasets, ICDM '08 Proceedings of the 2008 Eighth IEEE International Conference on Data Mining, pages 263-272.
-Parameters:
-  lambda alpha n_factors n_iterations min_item_nr seed
-1    0.1    10        10           10           1 NULL
-
-$IBCF_realRatingMatrix
-Recommender method: IBCF for realRatingMatrix
-Description: Recommender based on item-based collaborative filtering.
-Reference: NA
-Parameters:
-   k   method normalize normalize_sim_matrix alpha na_as_zero
-1 30 &quot;Cosine&quot;  &quot;center&quot;                FALSE   0.5      FALSE
-
-$POPULAR_realRatingMatrix
-Recommender method: POPULAR for realRatingMatrix
-Description: Recommender based on item popularity.
-Reference: NA
-Parameters:
-  normalize    aggregationRatings aggregationPopularity
-1  &quot;center&quot; new(&quot;standardGeneric&quot; new(&quot;standardGeneric&quot;
-
-$RANDOM_realRatingMatrix
-Recommender method: RANDOM for realRatingMatrix
-Description: Produce random recommendations (real ratings).
-Reference: NA
-Parameters: None
-
-$RERECOMMEND_realRatingMatrix
-Recommender method: RERECOMMEND for realRatingMatrix
-Description: Re-recommends highly rated items (real ratings).
-Reference: NA
-Parameters:
-  randomize minRating
-1         1        NA
-
-$SVD_realRatingMatrix
-Recommender method: SVD for realRatingMatrix
-Description: Recommender based on SVD approximation with column-mean imputation.
-Reference: NA
-Parameters:
-   k maxiter normalize
-1 10     100  &quot;center&quot;
-
-$SVDF_realRatingMatrix
-Recommender method: SVDF for realRatingMatrix
-Description: Recommender based on Funk SVD with gradient descend.
-Reference: NA
-Parameters:
-   k gamma lambda min_epochs max_epochs min_improvement normalize verbose
-1 10 0.015  0.001         50        200           1e-06  &quot;center&quot;   FALSE
-
-$UBCF_realRatingMatrix
+<p>The recommender algorithms are stored in a registry object called <code>recommenderRegistry</code>. We can get a look at the different models based on the different matrix types.</p>
+<pre class="r"><code>names(recommenderRegistry$get_entries())</code></pre>
+<pre><code> [1] &quot;ALS_realRatingMatrix&quot;            &quot;ALS_implicit_realRatingMatrix&quot;  
+ [3] &quot;ALS_implicit_binaryRatingMatrix&quot; &quot;AR_binaryRatingMatrix&quot;          
+ [5] &quot;IBCF_binaryRatingMatrix&quot;         &quot;IBCF_realRatingMatrix&quot;          
+ [7] &quot;POPULAR_binaryRatingMatrix&quot;      &quot;POPULAR_realRatingMatrix&quot;       
+ [9] &quot;RANDOM_realRatingMatrix&quot;         &quot;RANDOM_binaryRatingMatrix&quot;      
+[11] &quot;RERECOMMEND_realRatingMatrix&quot;    &quot;SVD_realRatingMatrix&quot;           
+[13] &quot;SVDF_realRatingMatrix&quot;           &quot;UBCF_binaryRatingMatrix&quot;        
+[15] &quot;UBCF_realRatingMatrix&quot;          </code></pre>
+<p>Since our matrix is a real ratings matrix, we’ll call the algorithms available for working on numeric ratings based review data as stored in the <code>realRatingMatrix</code>. Here, I’ve pulled the descriptions of each of the algorithms available for working with real user ratings data.</p>
+<pre class="r"><code>vapply(recommenderRegistry$get_entries(dataType = &quot;realRatingMatrix&quot;), 
+       '[[', 
+       FUN.VALUE = &quot;character&quot;, 
+       &quot;description&quot;)</code></pre>
+</div>
+<div id="exploring-user-based-collaborative-filtering" class="section level2">
+<h2>Exploring User-based Collaborative Filtering</h2>
+<p>In the algorithms registry, the last algorithm provided in the listing is the one we’ll use to explore user-based collaborative filtering (UBCF) to fit the UBCF algorithm to the <code>realRatingMatrix</code> of MovieLense reviews data. Information about this algorithm per the registry:</p>
+<pre><code>$UBCF_realRatingMatrix
 Recommender method: UBCF for realRatingMatrix
 Description: Recommender based on user-based collaborative filtering.
 Reference: NA
 Parameters:
     method nn sample normalize
 1 &quot;cosine&quot; 25  FALSE  &quot;center&quot;</code></pre>
+<p>There are 4 parameters to account for with this model as described above:</p>
+<ul>
+<li><p><strong>method</strong>: this is the type of similarity metric to calculate similarity between users real ratings profile. Cosine similarity, Pearson correlation coefficient, and Jaccard similarity are available options. The first two are not good options if using unary ratings, but work well for this scenario.</p></li>
+<li><p><strong>nn</strong>: this parameter sets the neighborhood of most similar users to consider for each user profile. the ratings profiles of the k nearest neighbors will be the basis for making predictions on a users unrated items profile.</p></li>
+<li><p><strong>sample</strong>: a logical value to indicate whether the data should be sampled for train/test. Probably best to explicitely set a reproducible seed and sample the data before running the model.</p></li>
+<li><p><strong>normalize</strong>: how to normalize real ratings provided by different users. This is crucially important b/c all users have a different bias in how they tend to rate items. This can be done by passing a value to this parameter inside the algorithm or applied to the matrix before any modeling too. See <code>?normalize</code> for additional details.</p></li>
+</ul>
+<div id="normalize-the-data" class="section level3">
+<h3>Normalize the data</h3>
+<p>Since we’re working with explicit real ratings of users, we need to acocunt for individual row bias of each user and make sure that all ratings are scaled similarly. The implication of not doing this could be potentially disasterous on new predicted ratings for any given user, dependent upon the different ratings bias of their k nearest neighbors.</p>
+<p>Here, user rating <em>zero mean centering</em> is used, where each user’s vector of ratings is subtracted by its own mean to center the mean at zero. Z-scoring is an alternative method available too that additionally divides each user’s rating by its standard deviation.</p>
+<p>** maybe visualize the distribution of user ratings here too after normalization vs. before normalization **</p>
 </div>
-<div id="exploring-user-based-collaborative-filtering" class="section level2">
-<h2>Exploring User-based Collaborative Filtering</h2>
-<p>In the registry above, the last algorithm provided in the listing is the one we’ll use to explore user-based collaborative filtering (UBCF). We fit the UBCF algorithm to our <code>realRatingMatrix</code> of MovieLense reviews data below. The API is very straightforward, and the model can be generated in a single line of code when using the default hyper parameters.</p>
-<pre class="r"><code>ubcf_model &lt;- Recommender(movie_r, method = &quot;UBCF&quot;)</code></pre>
+<div id="split-the-data-into-train-test" class="section level3">
+<h3>Split the data into Train &amp; Test</h3>
+<p>So we can more objectively measure the performance of the UBCF recommender system, we will build it on a subset of training records, and test the model on a different subset of testing records that were withheld from the modeling process.</p>
+<pre><code>[1] TRUE</code></pre>
+</div>
+<div id="fit-the-model-on-training-data" class="section level3">
+<h3>Fit the model on Training Data</h3>
+<p>Having zero mean centered each user’s ratings to control for user bias, and splitting the data into model training and model testing partitions, time to fit a model. Parameters were tuned from defaults for illustrative purposes.</p>
+<pre class="r"><code>ubcf_model &lt;- Recommender(train, method = &quot;UBCF&quot;, 
+                          parameter = list(method = &quot;cosine&quot;,
+                                           nn = 10, # find each user's 10 most similar users. 
+                                           sample = FALSE, # already did this.
+                                           normalize = NA)) # already did this. </code></pre>
 <p>Now that we have a model, we can look at its metadata, such as the hyperparameters used to filter user recommendations.</p>
 <pre class="r"><code>getModel(ubcf_model)</code></pre>
 <pre><code>$description
 [1] &quot;UBCF-Real data: contains full or sample of data set&quot;
 
 $data
-943 x 1664 rating matrix of class 'realRatingMatrix' with 99392 ratings.
+661 x 1664 rating matrix of class 'realRatingMatrix' with 69133 ratings.
 Normalized using center on rows.
 
 $method
 [1] &quot;cosine&quot;
 
 $nn
-[1] 25
+[1] 10
 
 $sample
 [1] FALSE
 
 $normalize
-[1] &quot;center&quot;
+[1] NA
 
 $verbose
 [1] FALSE</code></pre>
+</div>
 </div>
 <div id="strengs-weaknesses-of-neighborhood-methods" class="section level2">
 <h2>Strengs &amp; Weaknesses of Neighborhood Methods</h2>
