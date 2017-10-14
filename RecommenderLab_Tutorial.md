@@ -111,31 +111,9 @@ Below is a preview of the ratings matrix of users and their ratings. Rows repres
 ```
 
 
-Let's preview some of the movies rated by User #1. User 1's given an average rating of 3.61.
+For a particular user such as User 1, they gave an average rating of 3.61. 10 of the movies rated by them are shown below. 
 
 
-```
-                                    Toy Story (1995) 
-                                                   5 
-                                    GoldenEye (1995) 
-                                                   3 
-                                   Four Rooms (1995) 
-                                                   4 
-                                   Get Shorty (1995) 
-                                                   3 
-                                      Copycat (1995) 
-                                                   3 
-Shanghai Triad (Yao a yao yao dao waipo qiao) (1995) 
-                                                   5 
-                               Twelve Monkeys (1995) 
-                                                   4 
-                                         Babe (1995) 
-                                                   1 
-                             Dead Man Walking (1995) 
-                                                   5 
-                                  Richard III (1995) 
-                                                   3 
-```
 
 The `getRatings` function returns the non-missing ratings values from the matrix as a numeric vector. The following histogram shows the distribution of all movie ratings in the dataset. We can see that ratings typically skew higher, centered around a median rating of 4. 
 
@@ -162,24 +140,9 @@ Using our `realRatingMatrix` object, we can also extract row counts to visualize
 In terms of understanding the density values, this histogram has bin-width set to 20; with a density of close to 0.01125 for the first bin, the tallest bar this bin represents approximately 0.01125 x 10 units per bin = 0.225 total proportion of the individual reviewers in the data. In other words, 22.5% of the 943 in the data have given fewer than 10 reviews. 
 
 
-```r
-summary(rowCounts(movie_r))
-```
-
 ```
    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
    19.0    32.0    64.0   105.4   147.5   735.0 
-```
-
-```r
-rowCounts(movie_r) %>%
-  data.frame(reviews_per_person = .) %>%
-  ggplot(aes(x = reviews_per_person)) + 
-    geom_histogram(aes(y = ..density..), binwidth = 20) +
-    scale_y_continuous(limits = c(0,.0125), 
-                       breaks = seq(0, .0125, by = 0.0025),
-                       labels = seq(0, .0125, by = 0.0025)) +
-    labs(title = 'Number of Ratings Per MovieLense Reviewer')
 ```
 
 ![](RecommenderLab_Tutorial_files/figure-html/unnamed-chunk-11-1.png)<!-- -->
@@ -189,22 +152,9 @@ Additionally, we can take a look at the average number of ratings given per each
 With a median number of reviews of 27 per user and 1664 different movies available to rate, we know that the data is sparse with a lot of users not having rated most of the movies available. 
 
 
-```r
-summary(colCounts(movie_r))
-```
-
 ```
    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
    1.00    7.00   27.00   59.73   80.00  583.00 
-```
-
-```r
-colCounts(movie_r) %>%
-  data.frame(movie_review_count = .) %>%
-  ggplot(aes(x = movie_review_count)) + 
-    geom_histogram(aes(y = ..density..), binwidth = 20) +
-    scale_y_continuous(limits = c(0,.0175)) +
-    labs(title = 'Number of Reviews Per MovieLense listed Movie')
 ```
 
 ![](RecommenderLab_Tutorial_files/figure-html/unnamed-chunk-12-1.png)<!-- -->
@@ -217,10 +167,6 @@ colCounts(movie_r) %>%
 
 The recommender algorithms are stored in a registry object called `recommenderRegistry`. We can get a look at the different models based on the different matrix types.
 
-
-```r
-names(recommenderRegistry$get_entries())
-```
 
 ```
  [1] "ALS_realRatingMatrix"            "ALS_implicit_realRatingMatrix"  
@@ -236,17 +182,36 @@ names(recommenderRegistry$get_entries())
 Since our matrix is a real ratings matrix, we'll call the algorithms available for working on numeric ratings based review data as stored in the `realRatingMatrix`. Here, I've pulled the descriptions of each of the algorithms available for working with real user ratings data. 
 
 
-```r
-vapply(recommenderRegistry$get_entries(dataType = "realRatingMatrix"), 
-       '[[', 
-       FUN.VALUE = "character", 
-       "description")
+```
+                                                                                          ALS_realRatingMatrix 
+"Recommender for explicit ratings based on latent factors, calculated by alternating least squares algorithm." 
+                                                                                 ALS_implicit_realRatingMatrix 
+   "Recommender for implicit data based on latent factors, calculated by alternating least squares algorithm." 
+                                                                                         IBCF_realRatingMatrix 
+                                                    "Recommender based on item-based collaborative filtering." 
+                                                                                      POPULAR_realRatingMatrix 
+                                                                       "Recommender based on item popularity." 
+                                                                                       RANDOM_realRatingMatrix 
+                                                              "Produce random recommendations (real ratings)." 
+                                                                                  RERECOMMEND_realRatingMatrix 
+                                                            "Re-recommends highly rated items (real ratings)." 
+                                                                                          SVD_realRatingMatrix 
+                                         "Recommender based on SVD approximation with column-mean imputation." 
+                                                                                         SVDF_realRatingMatrix 
+                                                        "Recommender based on Funk SVD with gradient descend." 
+                                                                                         UBCF_realRatingMatrix 
+                                                    "Recommender based on user-based collaborative filtering." 
 ```
 
 ## Exploring User-based Collaborative Filtering
 
 In the algorithms registry, the last algorithm provided in the listing is the one we'll use to explore user-based collaborative filtering (UBCF) to fit the UBCF algorithm to the `realRatingMatrix` of MovieLense reviews data. Information about this algorithm per the registry:
 
+
+```r
+ubcf_model_description <- tail(recommenderRegistry$get_entries(dataType = "realRatingMatrix"), 1)
+ubcf_model_description
+```
 
 ```
 $UBCF_realRatingMatrix
@@ -277,61 +242,82 @@ User rating *zero mean centering* will be used for modeling, where each user's v
 ** maybe visualize the distribution of user ratings here too after normalization vs. before normalization **
 
 
-### Split the data into Train & Test
-
-So we can more objectively measure the performance of the UBCF recommender system, we will build it on a subset of training records, and test the model on a different subset of testing records that were withheld from the modeling process. 
-
-
-```
-[1] TRUE
-```
-
-### Fit the model on Training Data
-
-Having zero mean centered each user's ratings to control for user bias, and splitting the data into model training and model testing partitions, time to fit a model. Parameters were tuned from defaults for illustrative purposes. 
-
-
-```r
-rec_model_train <- Recommender(train, method = "UBCF", 
-                          parameter = list(method = "cosine",
-                                           nn = 10, # find each user's 10 most similar users. 
-                                           sample = FALSE, # already did this.
-                                           normalize = "center")) # already did this. 
-```
-
-How the UBCF algorithm using the parameters listed above works:
+### How the UBCF algorithm works
 
 1. Using [cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity), figure out how similar each user is to each other. 
   i) for each user, identify the *k* most similar users. Here, *k* parameter was the 10 most similar users who rated common items most similarly. 
-2. Per item, average the ratings by each user's 10 most similar users.
-  i) weight the average ratings based on similarity score of each user whose rated the item. Similarity score equals weight.
+2. Per item, average the ratings by each user's *k* most similar users.
+  i) weight the average ratings based on similarity score of each user whose rated the item. Similarity score equals weight, or
   ii) use any of the pythagorean averages, as suits the business case (arithmetic, geometric, harmonic)
 3. Select a Top-N recommendations threshold. 
 
-Now that we have a model, we can look at some of its details. 
+
+###  Set Up a Model Training & Evaluation Scheme
+
+The next step is to set up a model training and testing scheme. There are many ways to go about doing this. The simplest is to build the recommender on a subset of training records, and test the model on a different subset of testing records that were withheld from the modeling process. We'll use the `evaluationScheme` function within `recommenderLab`.
 
 
 ```r
-rec_model_train_details <- getModel(rec_model_train)
-# the attributes from the getModel() function.
-names(rec_model_train_details)
+train_proportion <- .75
+# shouldn't keep n rec. items > min(rowCounts(movie_r))
+min(rowCounts(movie_r))
 ```
 
 ```
-[1] "description" "data"        "method"      "nn"          "sample"     
-[6] "normalize"   "verbose"    
+[1] 19
 ```
 
 ```r
-rec_model_train_details$data
+items_per_test_user_keep <- 10
+# What's a good rating for a binary split?
+good_threshold <- 4
 ```
 
-```
-661 x 1664 rating matrix of class 'realRatingMatrix' with 69133 ratings.
-Normalized using center on rows.
+The first thing to do is prepare the data, and set parameters for how the recommender algorithm will train the model. The scheme has been setup to use a single test dataset, train the data on a 75% random sample of the data. In the test set,  
+10 items per user will be given to the recommender algorithm and the remaining test user's items will be held out for computing rating prediction error.
+
+
+```r
+# Building a Recommender System with R by Gorakala and Usuelli. Ch.4 pp 77 - 83
+set.seed(123)
+model_train_scheme <- evaluationScheme(data = movie_r,
+                 method = 'split', # single train/test split
+                 train = train_proportion, # proportion of rows to train. 
+                 given = items_per_test_user_keep, # shouldn't keep n rec. items > min(rowCounts(movie_r))
+                 goodRating = good_threshold, # for binary classifier analysis. 
+                 k = 1)
 ```
 
-The `rec_model_train_details$data` object is a realRatingMatrix that contains all of the training data. 
+Having set our `evaluationScheme` and stored it in an object called *model_train_scheme*, we can fit a UBCF recommender system model. 
+
+
+```r
+# Building a Recommender System with R by Gorakala and Usuelli. Ch.4 pp 84
+model_params <- list(method = "cosine",
+                     nn = 10, # find each user's 10 most similar users.
+                     sample = FALSE, # already did this.
+                     normalize = "center")
+
+ubcf_model_train <- Recommender(data = getData(model_train_scheme, "train"), #only fit on the 75% training data.
+                                method = "UBCF",
+                                parameter = model_params)
+```
+
+### Evaluate Predictive Performance 
+
+Having built the model, next step is to use the holdout testing data to evaluate the model's performance. The `getData` gives us access to different datasets in the model training scheme. We used the *train* data to build the model. There is also *known* and *unknown* test data available for evaluation. The *known* portion returns the specified 10 items per test user to run through the recommender algorithm. These *known* records per test user will calibrate the test user's similarity to the trained records, identify and weight its nearest *k* neighbors, and then make item ratings or recommendation predictions. The predicted ratings or recommended items are compared to the remaining items for each test user that are still hidden or *unknown*. These *unknown* data therefore will be used to help compute prediction error of the model. 
+
+Since testing the algorithm with new data requires a known battery of item ratings to calibrate each test user and make recommendations on new items, and an unknown portion of ratings that can be used to calculate prediction error of these resulting recommendations, it's important that the *given* parameter is less than the minimum number of rated items available per user, so that *unknown* test data is available for every test case to measure prediction error of ratings. 
+
+Next, we use the *known* part of the test users' item data (10 items for each user) to make predicted ratings for new items of the test user that were hidden from the algorithm. We can also predict top N items instead of the ratings if that is preferred. 
+
+
+```r
+# 5.6. Evaluation of predicted ratings in recommenderLab vignette. 
+# https://cran.r-project.org/web/packages/recommenderlab/vignettes/recommenderlab.pdf
+ubcf_model_test_pred <- predict(ubcf_model_train, getData(model_train_scheme, "known"), type = "ratings")
+```
+
 
 
 ## Strengs & Weaknesses of Neighborhood Methods
@@ -341,3 +327,6 @@ The `rec_model_train_details$data` object is a realRatingMatrix that contains al
 * *Strengths*: simple to implement, and recommendations are easy to explain to user. Transparency about the recommendation to a user can be a great boost to the user's confidence in trusting a rating. 
  
 * *Weaknesses*: these algorithms do not too work well on very sparse ratings matrices. Additionally, they are computationally expensive as the entire user database needs to be processed as the basis of forming recommendations. These algorithms will not work from a cold start since a new user has no historic data profile or ratings for the algorithm to start from. 
+
+
+

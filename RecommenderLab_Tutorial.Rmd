@@ -92,9 +92,9 @@ getRatingMatrix(movie_r[1:10, 1:4])
 ```
 
 
-Let's preview some of the movies rated by User #1. User 1's given an average rating of `r round(rowMeans(movie_r[1, ]), 2)`.
+For a particular user such as User 1, they gave an average rating of `r round(rowMeans(movie_r[1, ]), 2)`. 10 of the movies rated by them are shown below. 
 
-``` {r}
+``` {r eval = FALSE}
 as(movie_r[1, ], "list")[[1]][1:10]
 ```
 
@@ -113,7 +113,7 @@ Using our `realRatingMatrix` object, we can also extract row counts to visualize
 
 In terms of understanding the density values, this histogram has bin-width set to 20; with a density of close to 0.01125 for the first bin, the tallest bar this bin represents approximately 0.01125 x 10 units per bin = `r 0.01125 * 20` total proportion of the individual reviewers in the data. In other words, `r 0.01125 * 20 * 100`% of the `r nrow(movie_r)` in the data have given fewer than 10 reviews. 
 
-``` {r echo = TRUE}
+``` {r }
 summary(rowCounts(movie_r))
 
 rowCounts(movie_r) %>%
@@ -131,7 +131,7 @@ Additionally, we can take a look at the average number of ratings given per each
 
 With a median number of reviews of `r median(colCounts(movie_r))` per user and `r ncol(movie_r)` different movies available to rate, we know that the data is sparse with a lot of users not having rated most of the movies available. 
 
-``` {r echo = TRUE}
+``` {r }
 summary(colCounts(movie_r))
 
 colCounts(movie_r) %>%
@@ -151,13 +151,13 @@ colCounts(movie_r) %>%
 
 The recommender algorithms are stored in a registry object called `recommenderRegistry`. We can get a look at the different models based on the different matrix types.
 
-``` {r echo = TRUE}
+``` {r}
 names(recommenderRegistry$get_entries())
 ```
 
 Since our matrix is a real ratings matrix, we'll call the algorithms available for working on numeric ratings based review data as stored in the `realRatingMatrix`. Here, I've pulled the descriptions of each of the algorithms available for working with real user ratings data. 
 
-``` {r eval = FALSE, echo = TRUE}
+``` {r}
 vapply(recommenderRegistry$get_entries(dataType = "realRatingMatrix"), 
        '[[', 
        FUN.VALUE = "character", 
@@ -168,7 +168,7 @@ vapply(recommenderRegistry$get_entries(dataType = "realRatingMatrix"),
 
 In the algorithms registry, the last algorithm provided in the listing is the one we'll use to explore user-based collaborative filtering (UBCF) to fit the UBCF algorithm to the `realRatingMatrix` of MovieLense reviews data. Information about this algorithm per the registry:
 
-``` {r}
+``` {r echo = TRUE}
 ubcf_model_description <- tail(recommenderRegistry$get_entries(dataType = "realRatingMatrix"), 1)
 ubcf_model_description
 ```
@@ -191,60 +191,77 @@ User rating *zero mean centering* will be used for modeling, where each user's v
 
 ** maybe visualize the distribution of user ratings here too after normalization vs. before normalization **
 ``` {r}
-
 movie_r_norm <- normalize(movie_r, method = 'center') # for visual comparison purposes. 
-
 remove(movie_r_norm)
 ```
 
-### Split the data into Train & Test
-
-So we can more objectively measure the performance of the UBCF recommender system, we will build it on a subset of training records, and test the model on a different subset of testing records that were withheld from the modeling process. 
-
-``` {r}
-set.seed(123)
-train_index <- sample(c(TRUE, FALSE), size = nrow(movie_r), 
-                      replace = TRUE, 
-                      prob = c (.7, .3)) # weights for train/test size
-
-train <- movie_r[train_index, ]
-test <- movie_r[!train_index, ]
-
-# check that train and test records sum up to movie_r records count. 
-sum(nrow(train), nrow(test)) == nrow(movie_r)
-```
-
-### Fit the model on Training Data
-
-Having zero mean centered each user's ratings to control for user bias, and splitting the data into model training and model testing partitions, time to fit a model. Parameters were tuned from defaults for illustrative purposes. 
-
-``` {r echo = TRUE}
-rec_model_train <- Recommender(train, method = "UBCF", 
-                          parameter = list(method = "cosine",
-                                           nn = 10, # find each user's 10 most similar users. 
-                                           sample = FALSE, # already did this.
-                                           normalize = "center")) # already did this. 
-```
-
-How the UBCF algorithm using the parameters listed above works:
+### How the UBCF algorithm works
 
 1. Using [cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity), figure out how similar each user is to each other. 
   i) for each user, identify the *k* most similar users. Here, *k* parameter was the 10 most similar users who rated common items most similarly. 
-2. Per item, average the ratings by each user's 10 most similar users.
-  i) weight the average ratings based on similarity score of each user whose rated the item. Similarity score equals weight.
+2. Per item, average the ratings by each user's *k* most similar users.
+  i) weight the average ratings based on similarity score of each user whose rated the item. Similarity score equals weight, or
   ii) use any of the pythagorean averages, as suits the business case (arithmetic, geometric, harmonic)
 3. Select a Top-N recommendations threshold. 
 
-Now that we have a model, we can look at some of its details. 
+
+###  Set Up a Model Training & Evaluation Scheme
+
+The next step is to set up a model training and testing scheme. There are many ways to go about doing this. The simplest is to build the recommender on a subset of training records, and test the model on a different subset of testing records that were withheld from the modeling process. We'll use the `evaluationScheme` function within `recommenderLab`.
 
 ``` {r echo = TRUE}
-rec_model_train_details <- getModel(rec_model_train)
-# the attributes from the getModel() function.
-names(rec_model_train_details)
-rec_model_train_details$data
+train_proportion <- .75
+# shouldn't keep n rec. items > min(rowCounts(movie_r))
+min(rowCounts(movie_r))
+items_per_test_user_keep <- 10
+# What's a good rating for a binary split?
+good_threshold <- 4
+
 ```
 
-The `rec_model_train_details$data` object is a `r class(rec_model_train_details$data)` that contains all of the training data. 
+The first thing to do is prepare the data, and set parameters for how the recommender algorithm will train the model. The scheme has been setup to use a single test dataset, train the data on a `r train_proportion * 100`% random sample of the data. In the test set,  
+`r items_per_test_user_keep` items per user will be given to the recommender algorithm and the remaining test user's items will be held out for computing rating prediction error.
+
+``` {r echo = TRUE}
+# Building a Recommender System with R by Gorakala and Usuelli. Ch.4 pp 77 - 83
+set.seed(123)
+model_train_scheme <- evaluationScheme(data = movie_r,
+                 method = 'split', # single train/test split
+                 train = train_proportion, # proportion of rows to train. 
+                 given = items_per_test_user_keep, # shouldn't keep n rec. items > min(rowCounts(movie_r))
+                 goodRating = good_threshold, # for binary classifier analysis. 
+                 k = 1)
+```
+
+Having set our `evaluationScheme` and stored it in an object called *model_train_scheme*, we can fit a UBCF recommender system model. 
+
+``` {r echo = TRUE}
+# Building a Recommender System with R by Gorakala and Usuelli. Ch.4 pp 84
+model_params <- list(method = "cosine",
+                     nn = 10, # find each user's 10 most similar users.
+                     sample = FALSE, # already did this.
+                     normalize = "center")
+
+ubcf_model_train <- Recommender(data = getData(model_train_scheme, "train"), #only fit on the 75% training data.
+                                method = "UBCF",
+                                parameter = model_params)
+```
+
+### Evaluate Predictive Performance 
+
+Having built the model, next step is to use the holdout testing data to evaluate the model's performance. The `getData` gives us access to different datasets in the model training scheme. We used the *train* data to build the model. There is also *known* and *unknown* test data available for evaluation. The *known* portion returns the specified `r items_per_test_user_keep` items per test user to run through the recommender algorithm. These *known* records per test user will calibrate the test user's similarity to the trained records, identify and weight its nearest *k* neighbors, and then make item ratings or recommendation predictions. The predicted ratings or recommended items are compared to the remaining items for each test user that are still hidden or *unknown*. These *unknown* data therefore will be used to help compute prediction error of the model. 
+
+Since testing the algorithm with new data requires a known battery of item ratings to calibrate each test user and make recommendations on new items, and an unknown portion of ratings that can be used to calculate prediction error of these resulting recommendations, it's important that the *given* parameter is less than the minimum number of rated items available per user, so that *unknown* test data is available for every test case to measure prediction error of ratings. 
+
+Next, we use the *known* part of the test users' item data (`r items_per_test_user_keep` items for each user) to make predicted ratings for new items of the test user that were hidden from the algorithm. We can also predict top N items instead of the ratings if that is preferred. 
+
+``` {r echo = TRUE}
+# 5.6. Evaluation of predicted ratings in recommenderLab vignette. 
+# https://cran.r-project.org/web/packages/recommenderlab/vignettes/recommenderlab.pdf
+ubcf_model_test_pred <- predict(ubcf_model_train, getData(model_train_scheme, "known"), type = "ratings")
+
+```
+
 
 
 ## Strengs & Weaknesses of Neighborhood Methods
@@ -254,3 +271,33 @@ The `rec_model_train_details$data` object is a `r class(rec_model_train_details$
 * *Strengths*: simple to implement, and recommendations are easy to explain to user. Transparency about the recommendation to a user can be a great boost to the user's confidence in trusting a rating. 
  
 * *Weaknesses*: these algorithms do not too work well on very sparse ratings matrices. Additionally, they are computationally expensive as the entire user database needs to be processed as the basis of forming recommendations. These algorithms will not work from a cold start since a new user has no historic data profile or ratings for the algorithm to start from. 
+
+
+``` {r eval = FALSE, include = FALSE}
+
+#So we can more objectively measure the performance of the UBCF recommender system, we will build it on a subset of training #records, and test the model on a different subset of testing records that were withheld from the modeling process. 
+
+#set.seed(123)
+#train_index <- sample(c(TRUE, FALSE), size = nrow(movie_r), 
+#                      replace = TRUE, 
+#                      prob = c (.7, .3)) # weights for train/test size
+
+#train <- movie_r[train_index, ]
+#test <- movie_r[!train_index, ]
+
+# check that train and test records sum up to movie_r records count. 
+#sum(nrow(train), nrow(test)) == nrow(movie_r)
+
+# Having zero mean centered each user's ratings to control for user bias, and splitting the data into model training and model testing partitions, time to fit a model. Parameters were tuned from defaults for illustrative purposes. 
+#rec_model_train <- Recommender(train, method = "UBCF", 
+#                          parameter = list(method = "cosine",
+#                                           nn = 10, # find each user's 10 most similar users. 
+#                                           sample = FALSE, # already did this.
+#                                           normalize = "center")) # already did this. 
+
+#rec_model_train_details <- getModel(rec_model_train)
+# the attributes from the getModel() function.
+#names(rec_model_train_details)
+#rec_model_train_details$data
+
+```
